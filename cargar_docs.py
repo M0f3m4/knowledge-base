@@ -20,8 +20,8 @@ embeddings = OllamaEmbeddings(
 
 # ── Dividir texto en fragmentos ──────────────────────────
 splitter = RecursiveCharacterTextSplitter(
-    chunk_size=500,
-    chunk_overlap=50
+    chunk_size=1000,
+    chunk_overlap=100
 )
 
 def cargar_pdf(ruta_pdf):

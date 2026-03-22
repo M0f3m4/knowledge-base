@@ -1,0 +1,373 @@
+[
+  {
+    "numero": "1",
+    "nombre": "PERIODO",
+    "clasificacion": "MANUAL",
+    "formula": null,
+    "razon": "Se captura al momento de importar el documento en el SITI. El documento especifica que es un dato que reporta la institución del periodo que está reportando."
+  },
+  {
+    "numero": "2",
+    "nombre": "CLAVE DE LA INSTITUCIÓN",
+    "clasificacion": "CATALOGO",
+    "formula": null,
+    "razon": "Se refiere a la clave asignada a la institución disponible en el 'Catálogo de Instituciones'. Se selecciona de una lista predefinida por la CNBV."
+  },
+  {
+    "numero": "3",
+    "nombre": "REPORTE",
+    "clasificacion": "CATALOGO",
+    "formula": null,
+    "razon": "Corresponde al número de reporte del 'Catálogo de Subreportes CC'. Para el reporte 0430, se reporta la clave 430."
+  },
+  {
+    "numero": "4",
+    "nombre": "IDENTIFICADOR DEL ACREDITADO ASIGNADO POR LA INSTITUCIÓN",
+    "clasificacion": "MANUAL",
+    "formula": null,
+    "razon": "Es el identificador único que la institución asigna internamente (número de cliente). La institución lo captura directamente de sus sistemas internos."
+  },
+  {
+    "numero": "5",
+    "nombre": "NOMBRE DEL ACREDITADO",
+    "clasificacion": "MANUAL",
+    "formula": null,
+    "razon": "La institución reporta el nombre del acreditado. El documento especifica reglas de formato (mayúsculas, sin acentos, sin abreviaciones) pero el banco captura este dato de sus sistemas."
+  },
+  {
+    "numero": "6",
+    "nombre": "RFC DEL ACREDITADO",
+    "clasificacion": "MANUAL",
+    "formula": null,
+    "razon": "La institución reporta el RFC asignado por las autoridades fiscales mexicanas (SAT). Aunque hay validaciones de formato, es un dato que el banco captura de sus sistemas."
+  },
+  {
+    "numero": "7",
+    "nombre": "CURP DEL ACREDITADO",
+    "clasificacion": "MANUAL",
+    "formula": null,
+    "razon": "Es la Clave Única de Registro de Población. La institución la reporta directamente de sus registros. Para no personas físicas, se envía vacío."
+  },
+  {
+    "numero": "8",
+    "nombre": "LOCALIDAD DEL DOMICILIO DEL ACREDITADO",
+    "clasificacion": "CATALOGO",
+    "formula": null,
+    "razon": "Se selecciona del 'Catálogo de Localidades' compatible con INEGI. Es una clave predefinida que la institución selecciona."
+  },
+  {
+    "numero": "9",
+    "nombre": "MUNICIPIO DEL DOMICILIO DEL ACREDITADO",
+    "clasificacion": "CATALOGO",
+    "formula": null,
+    "razon": "Corresponde al municipio del 'Catálogo de Localidades'. Se selecciona de una lista predefinida por la CNBV."
+  },
+  {
+    "numero": "10",
+    "nombre": "ESTADO DEL DOMICILIO DEL ACREDITADO",
+    "clasificacion": "CATALOGO",
+    "formula": null,
+    "razon": "Corresponde al estado del 'Catálogo de Localidades'. Se selecciona de una lista predefinida por la CNBV."
+  },
+  {
+    "numero": "11",
+    "nombre": "NACIONALIDAD DEL ACREDITADO",
+    "clasificacion": "CATALOGO",
+    "formula": null,
+    "razon": "Se selecciona del 'Catálogo de Nacionalidades' compatible con RENAPO. El documento especifica que se debe seleccionar la clave de nacionalidad."
+  },
+  {
+    "numero": "12",
+    "nombre": "ACTIVIDAD ECONÓMICA DEL ACREDITADO",
+    "clasificacion": "CATALOGO",
+    "formula": null,
+    "razon": "Se selecciona del 'Catálogo de Actividad Económica' compatible con SCIAN de INEGI. Es una clave predefinida."
+  },
+  {
+    "numero": "13",
+    "nombre": "GRUPO DE RIESGO",
+    "clasificacion": "MANUAL",
+    "formula": null,
+    "razon": "La institución reporta el nombre del grupo de riesgo al que pertenece el acreditado de acuerdo con definiciones específicas. Es un dato que captura de sus sistemas."
+  },
+  {
+    "numero": "14",
+    "nombre": "ACREDITADO RELACIONADO",
+    "clasificacion": "CATALOGO",
+    "formula": null,
+    "razon": "Se selecciona del 'Catálogo de Tipo Relación Entidad CC'. El documento especifica claves predefinidas: 8 (No Relacionada), 9 (Relacionada Relevante), 10 (Relacionada No Relevante)."
+  },
+  {
+    "numero": "15",
+    "nombre": "TIPO DE CARTERA",
+    "clasificacion": "CATALOGO",
+    "formula": null,
+    "razon": "Se selecciona del 'Catálogo de Tipo de Cartera Comercial'. Es una clave predefinida por la CNBV."
+  },
+  {
+    "numero": "16",
+    "nombre": "TIPO DE ANEXO",
+    "clasificacion": "CATALOGO",
+    "formula": null,
+    "razon": "Se selecciona del 'Catálogo de Tipo de Anexo'. El documento enumera claves predefinidas: 0, 18, 19, 20, 21, 22."
+  },
+  {
+    "numero": "17",
+    "nombre": "NÚMERO DE CONSULTA REALIZADA A LA SOCIEDAD DE INFORMACIÓN CREDITICIA",
+    "clasificacion": "MANUAL",
+    "formula": null,
+    "razon": "Es el número de folio de la consulta realizada a la SIC. La institución captura este dato de sus registros internos."
+  },
+  {
+    "numero": "18",
+    "nombre": "CLAVE LEI LEGAL ENTITY IDENTIFIER",
+    "clasificacion": "MANUAL",
+    "formula": null,
+    "razon": "Es un identificador global único asignado a personas morales. Si no existe, se envía vacío. La institución la obtiene de sus registros."
+  },
+  {
+    "numero": "19",
+    "nombre": "IDENTIFICADOR DEL CRÉDITO ASIGNADO POR LA INSTITUCIÓN",
+    "clasificacion": "MANUAL",
+    "formula": null,
+    "razon": "Es el identificador único que la institución asigna internamente a cada línea de crédito para su control interno. La institución lo captura de sus sistemas."
+  },
+  {
+    "numero": "20",
+    "nombre": "IDENTIFICADOR DEL CRÉDITO ASIGNADO METODOLOGÍA CNBV",
+    "clasificacion": "CALCULADO",
+    "formula": "Se calcula siguiendo la metodología CNBV descrita en Anexo 3: [Tipo de Crédito (1 dígito: siempre 2 para comerciales)] + [Institución (6 dígitos: clave asignada)] + [Fecha de otorgamiento (6 dígitos: AAAAMM)] + [RFC del Acreditado (13 caracteres)] + [Dígitos de control (3 dígitos: consecutivo asignado por la institución)]. Total 29 posiciones.",
+    "razon": "El documento especifica en Anexo 3 una metodología obligatoria con fórmula exacta para su construcción. Incluye elementos que se extrae (institución, fecha, RFC) y elementos que se generan (dígitos de control)."
+  },
+  {
+    "numero": "21",
+    "nombre": "IDENTIFICADOR CRÉDITO LÍNEA GRUPAL ASIGNADO METODOLOGÍA CNBV",
+    "clasificacion": "MANUAL",
+    "formula": null,
+    "razon": "La institución lo asigna internamente para líneas grupales. El documento especifica que se asigna por la institución siguiendo metodología CNBV. En caso de no ser línea grupal, se envía vacío."
+  },
+  {
+    "numero": "22",
+    "nombre": "DESTINO DEL CRÉDITO",
+    "clasificacion": "CATALOGO",
+    "formula": null,
+    "razon": "Se selecciona del 'Catálogo Destino del Crédito Comercial'. El documento enumera claves predefinidas como 181, 310, 311, 312, etc."
+  },
+  {
+    "numero": "23",
+    "nombre": "MONTO DE LA LÍNEA DE CRÉDITO AUTORIZADO VALORIZADO EN PESOS",
+    "clasificacion": "CALCULADO",
+    "formula": "Se obtiene convirtiendo el monto autorizado a pesos utilizando el tipo de cambio indicado en el criterio contable A-2. Si ya está en pesos, se reporta directamente. La conversión es obligatoria para valores en moneda extranjera o UDIS.",
+    "razon": "El documento especifica que datos que incluyen moneda nacional, UDIS y moneda extranjera deben presentarse valorizados en pesos usando tipo de cambio de criterio A-2, lo que implica una operación de conversión."
+  },
+  {
+    "numero": "24",
+    "nombre": "MONTO DE LA LÍNEA DE CRÉDITO AUTORIZADO EN LA MONEDA DE ORIGEN",
+    "clasificacion": "MANUAL",
+    "formula": null,
+    "razon": "Es el monto total en la moneda original de contratación. Para créditos multimoneda, debe valorizarse en dólares americanos. La institución captura este dato de sus sistemas."
+  },
+  {
+    "numero": "25",
+    "nombre": "FECHA DE OTORGAMIENTO DE LA LÍNEA DE CRÉDITO",
+    "clasificacion": "MANUAL",
+    "formula": null,
+    "razon": "Según las reglas especificadas, las fechas de otorgamiento, vencimiento y máxima disposición son siempre MANUAL. Es la fecha en que se otorgó la línea."
+  },
+  {
+    "numero": "26",
+    "nombre": "FECHA DE VENCIMIENTO DE LA LÍNEA DE CRÉDITO",
+    "clasificacion": "MANUAL",
+    "formula": null,
+    "razon": "Es la fecha última de vencimiento de la línea de crédito. Las fechas son siempre MANUAL según las reglas especificadas."
+  },
+  {
+    "numero": "27",
+    "nombre": "FECHA MÁXIMA PARA DISPONER DE LOS RECURSOS",
+    "clasificacion": "MANUAL",
+    "formula": null,
+    "razon": "Es la fecha última para hacer disposiciones. Según las reglas especificadas, las fechas de máxima disposición son siempre MANUAL."
+  },
+  {
+    "numero": "28",
+    "nombre": "FORMA DE LA DISPOSICIÓN",
+    "clasificacion": "CATALOGO",
+    "formula": null,
+    "razon": "Se selecciona del 'Catálogo Disposición de Crédito'. El documento enumera claves: 101 (No Revolvente una sola disposición), 102 (múltiples), 103 (Revolvente), 104 (Sindicado)."
+  },
+  {
+    "numero": "29",
+    "nombre": "LÍNEA DE CRÉDITO REVOCABLE O IRREVOCABLE",
+    "clasificacion": "CATALOGO",
+    "formula": null,
+    "razon": "Se selecciona del 'Catálogo Revocable'. El documento especifica claves: 1 (Revocable), 2 (Irrevocable), 181 (Carta de Crédito)."
+  },
+  {
+    "numero": "30",
+    "nombre": "PRELACIÓN DE PAGO (CRÉDITO PREFERENTE O SUBORDINADO)",
+    "clasificacion": "CATALOGO",
+    "formula": null,
+    "razon": "Se selecciona del 'Catálogo Prelación de Pago'. El documento especifica claves: 1 (Preferente), 2 (Subordinado), 181 (Carta de Crédito)."
+  },
+  {
+    "numero": "31",
+    "nombre": "PORCENTAJE DE PARTICIPACIONES FEDERALES COMPROMETIDAS COMO FUENTE DE PAGO DEL CRÉDITO",
+    "clasificacion": "MANUAL",
+    "formula": null,
+    "razon": "La institución reporta el porcentaje comprometido de participaciones federales. Para acreditados diferentes a estado/municipio, se reporta cero. Es un dato que captura de sus sistemas."
+  },
+  {
+    "numero": "32",
+    "nombre": "CLAVE DE LA INSTITUCIÓN O AGENCIA DEL EXTERIOR OTORGANTE DE LOS RECURSOS",
+    "clasificacion": "CATALOGO",
+    "formula": null,
+    "razon": "Se selecciona del 'Catálogo de Institución o Agencia del Extranjero'. Si los recursos pertenecen a la propia institución, se reporta cero (0)."
+  },
+  {
+    "numero": "33",
+    "nombre": "TIPO DE ALTA DEL CRÉDITO",
+    "clasificacion": "CATALOGO",
+    "formula": null,
+    "razon": "Se selecciona del 'Catálogo de Alta de Crédito'. Las opciones se detallan en Anexo 5 'Tipos de Alta'. Es una lista predefinida."
+  },
+  {
+    "numero": "34",
+    "nombre": "MONEDA DE LA LÍNEA DE CRÉDITO",
+    "clasificacion": "CATALOGO",
+    "formula": null,
+    "razon": "Se selecciona del 'Catálogo de Monedas CC PE'. Para créditos multimoneda, se usa clave 999. Es una lista predefinida."
+  },
+  {
+    "numero": "35",
+    "nombre": "TIPO DE TASA DE INTERÉS DE LA LÍNEA DE CRÉDITO",
+    "clasificacion": "CATALOGO",
+    "formula": null,
+    "razon": "Se selecciona del 'Catálogo de Tasa Referencia CC'. Corresponde a la tasa fija o de referencia contractual. Es una lista predefinida."
+  },
+  {
+    "numero": "36",
+    "nombre": "DIFERENCIAL SOBRE TASA DE REFERENCIA DE LA LÍNEA DE CRÉDITO",
+    "clasificacion": "MANUAL",
+    "formula": null,
+    "razon": "Es el ajuste aplicado a la tasa de referencia. La institución reporta este número capturado de sus sistemas o del contrato. Si no hay ajuste, se reporta cero."
+  },
+  {
+    "numero": "37",
+    "nombre": "OPERACIÓN DE DIFERENCIAL SOBRE TASA DE REFERENCIA (ADITIVA O FACTOR) DE LA LÍNEA DE CRÉDITO",
+    "clasificacion": "CATALOGO",
+    "formula": null,
+    "razon": "Se selecciona del 'Catálogo Operación de Diferencial / Tasa de Int'. El documento especifica claves: 110 (Suma), 111 (Multiplicación), 112 (Resta), 119 (Otra operación)."
+  },
+  {
+    "numero": "38",
+    "nombre": "FRECUENCIA DE REVISIÓN DE LA TASA DE LA LÍNEA DE CRÉDITO",
+    "clasificacion": "MANUAL",
+    "formula": null,
+    "razon": "Es el número de días naturales entre revisiones de tasa. Si no hay frecuencia explícita, se reporta según políticas internas de la institución. Para tasa fija o multimoneda, se reporta cero."
+  },
+  {
+    "numero": "39",
+    "nombre": "PERIODICIDAD PAGOS DE CAPITAL",
+    "clasificacion": "CATALOGO",
+    "formula": null,
+    "razon": "Se selecciona del 'Catálogo Periodo de Pagos Capital'. El documento enumera claves: 1 (única al vencimiento), 2 (semanales), 4 (quincenales), 5 (mensuales), etc."
+  },
+  {
+    "numero": "40",
+    "nombre": "PERIODICIDAD PAGOS DE INTERESES",
+    "clasificacion": "CATALOGO",
+    "formula": null,
+    "razon": "Se selecciona del 'Catálogo Periodo de Pagos Intereses'. El documento enumera claves: 1 (vencimiento), 2 (semanales), 4 (quincenales), 5 (mensuales), etc."
+  },
+  {
+    "numero": "41",
+    "nombre": "NÚMERO DE MESES DE GRACIA PARA AMORTIZAR CAPITAL",
+    "clasificacion": "MANUAL",
+    "formula": null,
+    "razon": "La institución reporta el número de meses otorgados como periodo de gracia. Si hay incertidumbre o no hay gracia, se reporta cero. Es un dato contractual que captura la institución."
+  },
+  {
+    "numero": "42",
+    "nombre": "NÚMERO DE MESES DE GRACIA PARA PAGO DE INTERESES",
+    "clasificacion": "MANUAL",
+    "formula": null,
+    "razon": "La institución reporta el número de meses de gracia para pago de intereses. Si hay incertidumbre o no hay gracia, se reporta cero."
+  },
+  {
+    "numero": "43",
+    "nombre": "COMISIÓN DE APERTURA DEL CRÉDITO (TASA)",
+    "clasificacion": "MANUAL",
+    "formula": null,
+    "razon": "Es la tasa cobrada por apertura. La institución reporta este porcentaje de sus sistemas. Si se expresa en monto o no existe, se envía vacío."
+  },
+  {
+    "numero": "44",
+    "nombre": "COMISIÓN DE APERTURA DEL CRÉDITO (MONTO)",
+    "clasificacion": "MANUAL",
+    "formula": null,
+    "razon": "Es el monto en pesos de comisión de apertura. La institución reporta este dato de sus sistemas. Si se expresa en tasa o no existe, se envía vacío."
+  },
+  {
+    "numero": "45",
+    "nombre": "COMISIÓN POR DISPOSICIÓN DEL CRÉDITO (TASA)",
+    "clasificacion": "MANUAL",
+    "formula": null,
+    "razon": "Es la tasa cobrada por cada disposición. La institución reporta este porcentaje de sus sistemas. Si se expresa en monto o no existe, se envía vacío."
+  },
+  {
+    "numero": "46",
+    "nombre": "COMISIÓN POR DISPOSICIÓN DEL CRÉDITO (MONTO)",
+    "clasificacion": "MANUAL",
+    "formula": null,
+    "razon": "Es el monto en pesos de comisión por disposición. La institución reporta este dato de sus sistemas. Si se expresa en tasa o no existe, se envía vacío."
+  },
+  {
+    "numero": "47",
+    "nombre": "COSTO ANUAL TOTAL AL MOMENTO DEL OTORGAMIENTO DE LA LÍNEA DE CRÉDITO CALCULADO POR LA INSTITUCIÓN CON SEGUROS OBLIGATORIOS (CAT)",
+    "clasificacion": "CALCULADO",
+    "formula": "Es el Costo Anual Total calculado por la institución siguiendo la regulación de Banco de México (Circular 21/2009 y modificación 27/2009). Se aplica fórmula estándar de CAT que incorpora totalidad de costos y gastos. Se reporta como porcentaje en base cien con seis decimales.",
+    "razon": "El documento especifica que es calculado por la institución conforme a regulación expedida por Banco de México mediante circulares específicas. Implica una metodología de cálculo normada."
+  },
+  {
+    "numero": "48",
+    "nombre": "MONTO DEL CRÉDITO SIMPLE O MONTO AUTORIZADO DE LA LÍNEA DE CRÉDITO SIN INCLUIR ACCESORIOS FINANCIEROS",
+    "clasificacion": "MANUAL",
+    "formula": null,
+    "razon": "Es el monto principal sin accesorios financieros ni comisiones. La institución reporta este monto de sus sistemas. Si no aplica, se reporta cero."
+  },
+  {
+    "numero": "49",
+    "nombre": "MONTO DE LAS PRIMAS ANUALES DE TODOS LOS SEGUROS OBLIGATORIOS QUE LA INSTITUCIÓN COBRA AL ACREDITADO",
+    "clasificacion": "MANUAL",
+    "formula": null,
+    "razon": "Es el monto de primas de seguros obligatorios (vida, invalidez, desempleo, daños, robo). La institución reporta este monto de sus sistemas. Si no aplica, se reporta cero."
+  },
+  {
+    "numero": "50",
+    "nombre": "LOCALIDAD EN DONDE SE DESTINARÁ EL CRÉDITO",
+    "clasificacion": "CATALOGO",
+    "formula": null,
+    "razon": "Se selecciona del 'Catálogo Localidades'. Es la clave de localidad donde se aplicarán los recursos. Es una lista predefinida compatible con INEGI."
+  },
+  {
+    "numero": "51",
+    "nombre": "MUNICIPIO EN DONDE SE DESTINARÁ EL CRÉDITO",
+    "clasificacion": "CALCULADO",
+    "formula": "Se extrae del código de LOCALIDAD EN DONDE SE DESTINARÁ EL CRÉDITO. Según estándar INEGI, el municipio corresponde a las posiciones 3 a 5 del código de localidad (8 caracteres: SS-MMM-XXX donde SS=estado, MMM=municipio, XXX=localidad).",
+    "razon": "Según las reglas especificadas, MUNICIPIO EN DONDE SE DESTINARÁ EL CRÉDITO es CALCULADO al extraer las posiciones 3 a 5 del código de localidad."
+  },
+  {
+    "numero": "52",
+    "nombre": "ESTADO EN DONDE SE DESTINARÁ EL CRÉDITO",
+    "clasificacion": "CALCULADO",
+    "formula": "Se extrae del código de LOCALIDAD EN DONDE SE DESTINARÁ EL CRÉDITO. Según estándar INEGI, el estado corresponde a las primeras 2 posiciones del código de localidad (formato: SS-MMM-XXX).",
+    "razon": "Según las reglas especificadas, ESTADO EN DONDE SE DESTINARÁ EL CRÉDITO es CALCULADO al extraer las primeras 2 posiciones del código de localidad."
+  },
+  {
+    "numero": "53",
+    "nombre": "ACTIVIDAD ECONÓMICA A LA QUE SE DESTINARÁ EL CRÉDITO",
+    "clasificacion": "CATALOGO",
+    "formula": null,
+    "razon": "Se selecciona del 'Catálogo Actividad Económica'. Es la rama de actividad del destino de recursos, compatible con SCIAN de INEGI. Es una lista predefinida."
+  }
+]
