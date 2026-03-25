@@ -82,7 +82,7 @@ MONGO_URI=mongodb+srv://usuario:password@cluster.mongodb.net/
 DB_NAME=knowledge_base
 OLLAMA_URL=http://localhost:11434
 VOYAGE_API_KEY=al-xxxxxxxxxxxxxxxxxxxx
-ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxxxx
+
 ```
 
 > ✅ El cluster de MongoDB Atlas, los documentos y el índice vectorial ya están configurados — no necesitas hacer ninguna configuración adicional en Atlas.
