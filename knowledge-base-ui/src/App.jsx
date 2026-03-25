@@ -4,44 +4,54 @@ import "./App.css"
 
 const API = "http://localhost:8000"
 
+const REPORTES = ["", "0430", "0431", "0432"]
+
 const COMANDOS = [
-  { cmd: "consulta", desc: "Pregunta libre", ejemplo: "¿Qué es el reporte 0430?" },
-  { cmd: "campo", desc: "Info de un campo", ejemplo: "RFC 0430" },
-  { cmd: "calculo", desc: "Cómo se calcula", ejemplo: "20 0430" },
+  { id: "consulta", label: "Consulta", placeholder: "¿Qué campos son obligatorios en el reporte 0430?" },
+  { id: "campo",   label: "Campo",    placeholder: "RFC  o  20" },
+  { id: "calculo", label: "Cálculo",  placeholder: "municipio  o  20" },
+  { id: "reporte", label: "Reporte",  placeholder: "0430" },
 ]
 
-function Message({ msg }) {
+function Fuentes({ fuentes }) {
+  if (!fuentes || fuentes.length === 0) return null
+  const unicas = [...new Map(fuentes.map(f => [`${f.fuente}_${f.pagina}`, f])).values()]
   return (
-    <div className={`message ${msg.tipo}`}>
-      <div className="message-header">
-        <span className="message-icon">{msg.tipo === "user" ? "👤" : "🏦"}</span>
-        <span className="message-label">{msg.tipo === "user" ? "Tú" : "CNBV KB"}</span>
+    <div className="fuentes">
+      <span className="fuentes-label">📋</span>
+      {unicas.map((f, i) => (
+        <span key={i} className="fuente-tag">
+          {f.fuente.split("_")[0]}… p.{f.pagina}
+        </span>
+      ))}
+    </div>
+  )
+}
+
+function Mensaje({ msg }) {
+  return (
+    <div className={`msg msg-${msg.tipo}`}>
+      <div className="msg-meta">
+        <span className="msg-icon">{msg.tipo === "user" ? "👤" : "🏦"}</span>
+        <span className="msg-quien">{msg.tipo === "user" ? "Tú" : "CNBV KB"}</span>
+        {msg.cmd && <span className="msg-cmd">{msg.cmd}</span>}
       </div>
-      <div className="message-body">
+      <div className="msg-cuerpo">
         <pre>{msg.texto}</pre>
-        {msg.fuentes && msg.fuentes.length > 0 && (
-          <div className="fuentes">
-            <span className="fuentes-label">📋 Fuentes:</span>
-            {[...new Set(msg.fuentes.map(f => `${f.fuente.split("_")[0]} p.${f.pagina}`))].map((f, i) => (
-              <span key={i} className="fuente-tag">{f}</span>
-            ))}
-          </div>
-        )}
+        {msg.fuentes && <Fuentes fuentes={msg.fuentes} />}
       </div>
     </div>
   )
 }
 
 export default function App() {
-  const [mensajes, setMensajes] = useState([
-    {
-      tipo: "bot",
-      texto: "Bienvenido a la Base de Conocimiento CNBV.\n\nPuedes consultar sobre campos, cálculos y regulación bancaria.\n\nEscribe tu pregunta o selecciona un comando.",
-      fuentes: []
-    }
-  ])
+  const [mensajes, setMensajes] = useState([{
+    tipo: "bot",
+    texto: "Bienvenido a la Base de Conocimiento CNBV.\nHaz una consulta sobre campos, cálculos o regulación bancaria.",
+    fuentes: null
+  }])
   const [input, setInput] = useState("")
-  const [comando, setComando] = useState("consulta")
+  const [cmd, setCmd] = useState("consulta")
   const [reporte, setReporte] = useState("0430")
   const [cargando, setCargando] = useState(false)
   const bottomRef = useRef(null)
@@ -50,134 +60,100 @@ export default function App() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [mensajes])
 
+  const agregar = (msg) => setMensajes(prev => [...prev, msg])
+
   const enviar = async () => {
     if (!input.trim() || cargando) return
-
     const pregunta = input.trim()
     setInput("")
-    setMensajes(prev => [...prev, { tipo: "user", texto: pregunta, fuentes: [] }])
+
+    agregar({ tipo: "user", texto: pregunta, cmd, fuentes: null })
     setCargando(true)
 
     try {
       let res
-      if (comando === "consulta") {
-        res = await axios.post(`${API}/consulta`, {
-          pregunta,
-          reporte: reporte || null
-        })
-      } else if (comando === "campo") {
-        res = await axios.post(`${API}/campo`, {
-          pregunta: `${pregunta} ${reporte}`.trim()
-        })
-      } else if (comando === "calculo") {
-        res = await axios.post(`${API}/calculo`, {
-          pregunta: `${pregunta} ${reporte}`.trim()
-        })
-      }
-      setMensajes(prev => [...prev, {
+      const body = { pregunta, reporte: reporte || null }
+
+      if (cmd === "consulta") res = await axios.post(`${API}/consulta`, body)
+      else if (cmd === "campo")   res = await axios.post(`${API}/campo`, body)
+      else if (cmd === "calculo") res = await axios.post(`${API}/calculo`, body)
+      else if (cmd === "reporte") res = await axios.post(`${API}/reporte`, { pregunta: reporte || pregunta })
+
+      agregar({
         tipo: "bot",
         texto: res.data.respuesta,
-        fuentes: res.data.fuentes || []
-      }])
+        fuentes: res.data.fuentes,
+        cmd: null
+      })
     } catch (err) {
-      setMensajes(prev => [...prev, {
-        tipo: "bot",
-        texto: `❌ Error: ${err.message}`,
-        fuentes: []
-      }])
+      agregar({ tipo: "bot", texto: `❌ ${err.response?.data?.detail || err.message}`, fuentes: null })
     } finally {
       setCargando(false)
-    }
-  }
-
-  const handleKey = (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault()
-      enviar()
     }
   }
 
   return (
     <div className="app">
       <header className="header">
-        <div className="header-content">
+        <div className="header-inner">
           <div className="logo">
-            <span className="logo-icon">🏦</span>
+            <span>🏦</span>
             <div>
               <h1>Knowledge Base</h1>
-              <p>Regulación CNBV</p>
+              <p>Regulación CNBV · Atlas · Voyage · Mistral</p>
             </div>
           </div>
-          <div className="reporte-selector">
-            <label>Reporte</label>
-            <select value={reporte} onChange={e => setReporte(e.target.value)}>
-              <option value="">Todos</option>
-              <option value="0430">0430 - Altas</option>
-              <option value="0431">0431 - Seguimiento</option>
-              <option value="0432">0432 - Bajas</option>
-            </select>
-          </div>
+          <select className="reporte-select" value={reporte} onChange={e => setReporte(e.target.value)}>
+            <option value="">Todos</option>
+            <option value="0430">0430 — Altas</option>
+            <option value="0431">0431 — Seguimiento</option>
+            <option value="0432">0432 — Bajas</option>
+          </select>
         </div>
       </header>
 
-      <div className="chat-container">
-        <div className="messages">
-          {mensajes.map((msg, i) => (
-            <Message key={i} msg={msg} />
-          ))}
-          {cargando && (
-            <div className="message bot">
-              <div className="message-header">
-                <span className="message-icon">🏦</span>
-                <span className="message-label">CNBV KB</span>
-              </div>
-              <div className="message-body loading">
-                <span></span><span></span><span></span>
-              </div>
+      <main className="chat">
+        {mensajes.map((m, i) => <Mensaje key={i} msg={m} />)}
+        {cargando && (
+          <div className="msg msg-bot">
+            <div className="msg-meta">
+              <span className="msg-icon">🏦</span>
+              <span className="msg-quien">CNBV KB</span>
             </div>
-          )}
-          <div ref={bottomRef} />
-        </div>
+            <div className="msg-cuerpo">
+              <div className="dots"><span/><span/><span/></div>
+            </div>
+          </div>
+        )}
+        <div ref={bottomRef} />
+      </main>
 
-        <div className="input-area">
-          <div className="comandos">
-            {COMANDOS.map(c => (
-              <button
-                key={c.cmd}
-                className={`cmd-btn ${comando === c.cmd ? "active" : ""}`}
-                onClick={() => setComando(c.cmd)}
-                title={c.ejemplo}
-              >
-                {c.cmd}
-              </button>
-            ))}
-          </div>
-          <div className="input-row">
-            <textarea
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={handleKey}
-              placeholder={
-                comando === "consulta" ? "Escribe tu pregunta..." :
-                comando === "campo" ? "Ej: RFC  o  20" :
-                "Ej: municipio  o  20"
-              }
-              rows={2}
-              disabled={cargando}
-            />
+      <footer className="footer">
+        <div className="cmds">
+          {COMANDOS.map(c => (
             <button
-              className="send-btn"
-              onClick={enviar}
-              disabled={cargando || !input.trim()}
+              key={c.id}
+              className={`cmd ${cmd === c.id ? "cmd-active" : ""}`}
+              onClick={() => setCmd(c.id)}
             >
-              {cargando ? "⏳" : "→"}
+              {c.label}
             </button>
-          </div>
-          <p className="hint">
-            {COMANDOS.find(c => c.cmd === comando)?.desc} — Ejemplo: <em>{COMANDOS.find(c => c.cmd === comando)?.ejemplo}</em>
-          </p>
+          ))}
         </div>
-      </div>
+        <div className="input-row">
+          <textarea
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviar() }}}
+            placeholder={COMANDOS.find(c => c.id === cmd)?.placeholder}
+            rows={2}
+            disabled={cargando}
+          />
+          <button className="send" onClick={enviar} disabled={cargando || !input.trim()}>
+            {cargando ? "⏳" : "→"}
+          </button>
+        </div>
+      </footer>
     </div>
   )
 }
