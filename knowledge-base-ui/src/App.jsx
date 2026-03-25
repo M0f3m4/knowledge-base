@@ -4,13 +4,11 @@ import "./App.css"
 
 const API = "http://localhost:8000"
 
-const REPORTES = ["", "0430", "0431", "0432"]
-
 const COMANDOS = [
-  { id: "consulta", label: "Consulta", placeholder: "¿Qué campos son obligatorios en el reporte 0430?" },
+  { id: "consulta", label: "Consulta", placeholder: "¿Qué campos son obligatorios en el 0430?" },
   { id: "campo",   label: "Campo",    placeholder: "RFC  o  20" },
   { id: "calculo", label: "Cálculo",  placeholder: "municipio  o  20" },
-  { id: "reporte", label: "Reporte",  placeholder: "0430" },
+  { id: "reporte", label: "Reporte",  placeholder: "Selecciona el reporte arriba" },
 ]
 
 function Fuentes({ fuentes }) {
@@ -45,115 +43,235 @@ function Mensaje({ msg }) {
 }
 
 export default function App() {
-  const [mensajes, setMensajes] = useState([{
-    tipo: "bot",
-    texto: "Bienvenido a la Base de Conocimiento CNBV.\nHaz una consulta sobre campos, cálculos o regulación bancaria.",
-    fuentes: null
-  }])
+  const [sesiones, setSesiones] = useState([])
+  const [sessionId, setSessionId] = useState(null)
+  const [mensajes, setMensajes] = useState([])
   const [input, setInput] = useState("")
   const [cmd, setCmd] = useState("consulta")
   const [reporte, setReporte] = useState("0430")
   const [cargando, setCargando] = useState(false)
+  const [editando, setEditando] = useState(null)
+  const [nuevoNombre, setNuevoNombre] = useState("")
   const bottomRef = useRef(null)
+
+  useEffect(() => {
+    cargarSesiones()
+  }, [])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [mensajes])
 
-  const agregar = (msg) => setMensajes(prev => [...prev, msg])
+  const cargarSesiones = async () => {
+    const res = await axios.get(`${API}/sesiones`)
+    setSesiones(res.data)
+  }
+
+  const nuevaSesion = async () => {
+    const nombre = `Sesión ${new Date().toLocaleDateString("es-MX", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}`
+    const res = await axios.post(`${API}/sesiones`, { nombre })
+    setSesiones(prev => [res.data, ...prev])
+    setSessionId(res.data.id)
+    setMensajes([{
+      tipo: "bot",
+      texto: "Nueva sesión iniciada. ¿En qué puedo ayudarte?",
+      fuentes: null
+    }])
+  }
+
+  const seleccionarSesion = async (id) => {
+    setSessionId(id)
+    const res = await axios.get(`${API}/sesiones/${id}/mensajes`)
+    if (res.data.length === 0) {
+      setMensajes([{ tipo: "bot", texto: "Sesión vacía. ¿En qué puedo ayudarte?", fuentes: null }])
+    } else {
+      setMensajes(res.data)
+    }
+  }
+
+  const eliminarSesion = async (e, id) => {
+    e.stopPropagation()
+    await axios.delete(`${API}/sesiones/${id}`)
+    setSesiones(prev => prev.filter(s => s.id !== id))
+    if (sessionId === id) {
+      setSessionId(null)
+      setMensajes([])
+    }
+  }
+
+  const renombrarSesion = async (e, id) => {
+    e.stopPropagation()
+    if (!nuevoNombre.trim()) return
+    await axios.put(`${API}/sesiones/${id}`, { nombre: nuevoNombre })
+    setSesiones(prev => prev.map(s => s.id === id ? { ...s, nombre: nuevoNombre } : s))
+    setEditando(null)
+    setNuevoNombre("")
+  }
 
   const enviar = async () => {
-    if (!input.trim() || cargando) return
+    if (!input.trim() || cargando || !sessionId) return
     const pregunta = input.trim()
     setInput("")
 
-    agregar({ tipo: "user", texto: pregunta, cmd, fuentes: null })
+    const msgUser = { tipo: "user", texto: pregunta, cmd, fuentes: null }
+    setMensajes(prev => [...prev, msgUser])
     setCargando(true)
 
     try {
+      const body = { pregunta, reporte: reporte || null, session_id: sessionId }
       let res
-      const body = { pregunta, reporte: reporte || null }
 
       if (cmd === "consulta") res = await axios.post(`${API}/consulta`, body)
       else if (cmd === "campo")   res = await axios.post(`${API}/campo`, body)
       else if (cmd === "calculo") res = await axios.post(`${API}/calculo`, body)
-      else if (cmd === "reporte") res = await axios.post(`${API}/reporte`, { pregunta: reporte || pregunta })
+      else if (cmd === "reporte") res = await axios.post(`${API}/reporte`, { ...body, pregunta: reporte || pregunta })
 
-      agregar({
+      setMensajes(prev => [...prev, {
         tipo: "bot",
         texto: res.data.respuesta,
         fuentes: res.data.fuentes,
         cmd: null
-      })
+      }])
+
+      // Actualizar nombre de sesión con la primera pregunta
+      const sesion = sesiones.find(s => s.id === sessionId)
+      if (sesion && sesion.nombre.startsWith("Sesión")) {
+        const nombre = pregunta.slice(0, 40) + (pregunta.length > 40 ? "..." : "")
+        await axios.put(`${API}/sesiones/${sessionId}`, { nombre })
+        setSesiones(prev => prev.map(s => s.id === sessionId ? { ...s, nombre } : s))
+      }
     } catch (err) {
-      agregar({ tipo: "bot", texto: `❌ ${err.response?.data?.detail || err.message}`, fuentes: null })
+      setMensajes(prev => [...prev, {
+        tipo: "bot",
+        texto: `❌ ${err.response?.data?.detail || err.message}`,
+        fuentes: null
+      }])
     } finally {
       setCargando(false)
     }
   }
 
+  const formatFecha = (fecha) => {
+    if (!fecha) return ""
+    return new Date(fecha).toLocaleDateString("es-MX", {
+      day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit"
+    })
+  }
+
   return (
     <div className="app">
-      <header className="header">
-        <div className="header-inner">
-          <div className="logo">
-            <span>🏦</span>
-            <div>
-              <h1>Knowledge Base</h1>
-              <p>Regulación CNBV · Atlas · Voyage · Mistral</p>
-            </div>
-          </div>
-          <select className="reporte-select" value={reporte} onChange={e => setReporte(e.target.value)}>
-            <option value="">Todos</option>
-            <option value="0430">0430 — Altas</option>
-            <option value="0431">0431 — Seguimiento</option>
-            <option value="0432">0432 — Bajas</option>
-          </select>
+      {/* Panel de sesiones */}
+      <aside className="sidebar">
+        <div className="sidebar-header">
+          <span className="sidebar-title">🏦 CNBV KB</span>
+          <button className="btn-nueva" onClick={nuevaSesion}>+ Nueva</button>
         </div>
-      </header>
-
-      <main className="chat">
-        {mensajes.map((m, i) => <Mensaje key={i} msg={m} />)}
-        {cargando && (
-          <div className="msg msg-bot">
-            <div className="msg-meta">
-              <span className="msg-icon">🏦</span>
-              <span className="msg-quien">CNBV KB</span>
-            </div>
-            <div className="msg-cuerpo">
-              <div className="dots"><span/><span/><span/></div>
-            </div>
-          </div>
-        )}
-        <div ref={bottomRef} />
-      </main>
-
-      <footer className="footer">
-        <div className="cmds">
-          {COMANDOS.map(c => (
-            <button
-              key={c.id}
-              className={`cmd ${cmd === c.id ? "cmd-active" : ""}`}
-              onClick={() => setCmd(c.id)}
+        <div className="sesiones-lista">
+          {sesiones.length === 0 && (
+            <p className="sidebar-empty">Sin sesiones.<br />Crea una nueva.</p>
+          )}
+          {sesiones.map(s => (
+            <div
+              key={s.id}
+              className={`sesion-item ${sessionId === s.id ? "sesion-activa" : ""}`}
+              onClick={() => seleccionarSesion(s.id)}
             >
-              {c.label}
-            </button>
+              {editando === s.id ? (
+                <input
+                  className="sesion-edit"
+                  value={nuevoNombre}
+                  onChange={e => setNuevoNombre(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter") renombrarSesion(e, s.id) }}
+                  onBlur={e => renombrarSesion(e, s.id)}
+                  autoFocus
+                  onClick={e => e.stopPropagation()}
+                />
+              ) : (
+                <>
+                  <div className="sesion-info">
+                    <span className="sesion-nombre">{s.nombre}</span>
+                    <span className="sesion-fecha">{formatFecha(s.updated_at)}</span>
+                  </div>
+                  <div className="sesion-acciones">
+                    <button onClick={e => { e.stopPropagation(); setEditando(s.id); setNuevoNombre(s.nombre) }} title="Renombrar">✏️</button>
+                    <button onClick={e => eliminarSesion(e, s.id)} title="Eliminar">🗑️</button>
+                  </div>
+                </>
+              )}
+            </div>
           ))}
         </div>
-        <div className="input-row">
-          <textarea
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviar() }}}
-            placeholder={COMANDOS.find(c => c.id === cmd)?.placeholder}
-            rows={2}
-            disabled={cargando}
-          />
-          <button className="send" onClick={enviar} disabled={cargando || !input.trim()}>
-            {cargando ? "⏳" : "→"}
-          </button>
+      </aside>
+
+      {/* Panel principal */}
+      <div className="main">
+        <header className="header">
+          <div className="header-inner">
+            <span className="header-titulo">
+              {sessionId ? sesiones.find(s => s.id === sessionId)?.nombre || "Sesión" : "Selecciona o crea una sesión"}
+            </span>
+            <select className="reporte-select" value={reporte} onChange={e => setReporte(e.target.value)}>
+              <option value="">Todos</option>
+              <option value="0430">0430 — Altas</option>
+              <option value="0431">0431 — Seguimiento</option>
+              <option value="0432">0432 — Bajas</option>
+            </select>
+          </div>
+        </header>
+
+        <div className="chat">
+          {!sessionId ? (
+            <div className="chat-empty">
+              <p>👈 Selecciona una sesión o crea una nueva</p>
+            </div>
+          ) : (
+            <>
+              {mensajes.map((m, i) => <Mensaje key={i} msg={m} />)}
+              {cargando && (
+                <div className="msg msg-bot">
+                  <div className="msg-meta">
+                    <span className="msg-icon">🏦</span>
+                    <span className="msg-quien">CNBV KB</span>
+                  </div>
+                  <div className="msg-cuerpo">
+                    <div className="dots"><span /><span /><span /></div>
+                  </div>
+                </div>
+              )}
+              <div ref={bottomRef} />
+            </>
+          )}
         </div>
-      </footer>
+
+        {sessionId && (
+          <footer className="footer">
+            <div className="cmds">
+              {COMANDOS.map(c => (
+                <button
+                  key={c.id}
+                  className={`cmd ${cmd === c.id ? "cmd-active" : ""}`}
+                  onClick={() => setCmd(c.id)}
+                >
+                  {c.label}
+                </button>
+              ))}
+            </div>
+            <div className="input-row">
+              <textarea
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviar() } }}
+                placeholder={COMANDOS.find(c => c.id === cmd)?.placeholder}
+                rows={2}
+                disabled={cargando}
+              />
+              <button className="send" onClick={enviar} disabled={cargando || !input.trim()}>
+                {cargando ? "⏳" : "→"}
+              </button>
+            </div>
+          </footer>
+        )}
+      </div>
     </div>
   )
 }

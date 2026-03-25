@@ -25,11 +25,12 @@ llm = OllamaLLM(
     temperature=0
 )
 
-REGLAS = """REGLAS:
+REGLAS = """REGLAS ESTRICTAS:
 - Usa ÚNICAMENTE los fragmentos proporcionados
 - NO uses conocimiento externo ni inventes información
-- Si algo no está en los fragmentos: escribe "No encontrado en los documentos"
-- Responde en español"""
+- Si algo no está en los fragmentos escribe: No encontrado en los documentos
+- SIEMPRE responde en español, NUNCA en inglés
+- NUNCA des explicaciones fuera del formato solicitado"""
 
 # ══════════════════════════════════════════════════════════
 # NÚCLEO
@@ -99,19 +100,31 @@ def construir_contexto(fragmentos):
     return texto, fuentes
 
 
+def construir_historial(mensajes):
+    if not mensajes:
+        return ""
+    historial = "\nCONVERSACIÓN PREVIA:\n"
+    for m in mensajes[-6:]:
+        rol = "Usuario" if m["tipo"] == "user" else "Asistente"
+        historial += f"{rol}: {m['texto'][:300]}\n"
+    return historial
+
+
 # ══════════════════════════════════════════════════════════
 # FUNCIONES PÚBLICAS
 # ══════════════════════════════════════════════════════════
 
-def consultar_campo(argumento):
+def consultar_campo(argumento, historial=None):
     campo, reporte = resolver_campo(argumento)
     fragmentos = buscar(f"{campo} origen descripcion reporte {reporte or ''}", reporte=reporte)
     ctx, fuentes = construir_contexto(fragmentos)
+    hist = construir_historial(historial or [])
 
-    prompt = f"""[INST] Eres experto en regulación bancaria CNBV.
+    prompt = f"""[INST] Eres experto en regulación bancaria CNBV. Responde SOLO en español.
 {REGLAS}
+{hist}
 
-Responde sobre "{campo}" con EXACTAMENTE este formato (5 líneas, nada más):
+Responde sobre "{campo}" con EXACTAMENTE estas 5 líneas en español, nada más:
 - CAMPO: {campo}
 - ORIGEN: [PERSONA / LINEA_CREDITO / CATALOGO / CALCULADO / DEFAULT]
 - TIPO: [captura manual / calculado / catálogo]
@@ -120,20 +133,24 @@ Responde sobre "{campo}" con EXACTAMENTE este formato (5 líneas, nada más):
 
 FRAGMENTOS:
 {ctx}
+
+Responde SOLO en español con el formato de 5 líneas indicado.
 [/INST]"""
 
     return {"respuesta": llm.invoke(prompt), "fuentes": fuentes, "campo": campo, "reporte": reporte}
 
 
-def consultar_calculo(argumento):
+def consultar_calculo(argumento, historial=None):
     campo, reporte = resolver_campo(argumento)
     fragmentos = buscar(f"calcular {campo} formula metodologia", top_k=10, reporte=reporte)
     ctx, fuentes = construir_contexto(fragmentos)
+    hist = construir_historial(historial or [])
 
-    prompt = f"""[INST] Eres experto en regulación bancaria CNBV.
+    prompt = f"""[INST] Eres experto en regulación bancaria CNBV. Responde SOLO en español.
 {REGLAS}
+{hist}
 
-Explica el cálculo de "{campo}" con EXACTAMENTE este formato (6 líneas, nada más):
+Explica el cálculo de "{campo}" con EXACTAMENTE estas 6 líneas en español, nada más:
 - CAMPO: {campo}
 - SE PUEDE CALCULAR: [Sí / No]
 - FORMULA: [fórmula exacta; si no: No especificada]
@@ -143,19 +160,23 @@ Explica el cálculo de "{campo}" con EXACTAMENTE este formato (6 líneas, nada m
 
 FRAGMENTOS:
 {ctx}
+
+Responde SOLO en español con el formato de 6 líneas indicado.
 [/INST]"""
 
     return {"respuesta": llm.invoke(prompt), "fuentes": fuentes, "campo": campo}
 
 
-def consultar_reporte(numero):
+def consultar_reporte(numero, historial=None):
     fragmentos = buscar(f"reporte {numero} columnas campos secciones", top_k=10, reporte=numero)
     ctx, fuentes = construir_contexto(fragmentos)
+    hist = construir_historial(historial or [])
 
-    prompt = f"""[INST] Eres experto en regulación bancaria CNBV.
+    prompt = f"""[INST] Eres experto en regulación bancaria CNBV. Responde SOLO en español.
 {REGLAS}
+{hist}
 
-Lista los campos del reporte {numero} en este formato de tabla exacto:
+Lista los campos del reporte {numero} en este formato de tabla exacto en español:
 | # | Campo | Origen | Calculable |
 |---|-------|--------|------------|
 (Origen: PERSONA / LINEA_CREDITO / CALCULADO / CATALOGO / DEFAULT)
@@ -163,25 +184,31 @@ Lista los campos del reporte {numero} en este formato de tabla exacto:
 
 FRAGMENTOS:
 {ctx}
+
+Responde SOLO en español con la tabla indicada.
 [/INST]"""
 
     return {"respuesta": llm.invoke(prompt), "fuentes": fuentes, "reporte": numero}
 
 
-def consultar_libre(pregunta, reporte=None):
+def consultar_libre(pregunta, reporte=None, historial=None):
     fragmentos = buscar(pregunta, reporte=reporte)
     ctx, fuentes = construir_contexto(fragmentos)
+    hist = construir_historial(historial or [])
 
-    prompt = f"""[INST] Eres experto en regulación bancaria mexicana CNBV.
+    prompt = f"""[INST] Eres experto en regulación bancaria mexicana CNBV. Responde SOLO en español.
 {REGLAS}
+{hist}
 
-Responde la pregunta usando solo los fragmentos.
+Responde la pregunta en español usando solo los fragmentos.
 Cita página y documento cuando uses información específica.
 
 FRAGMENTOS:
 {ctx}
 
 PREGUNTA: {pregunta}
+
+Responde SOLO en español.
 [/INST]"""
 
     return {"respuesta": llm.invoke(prompt), "fuentes": fuentes}
