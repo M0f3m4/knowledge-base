@@ -168,6 +168,17 @@ Responde SOLO en español con el formato de 6 líneas indicado.
 
 
 def consultar_reporte(numero, historial=None):
+    from columnas_0430 import COLUMNAS
+
+    # Si el reporte tiene mapa de columnas, usarlo directamente
+    if numero in COLUMNAS:
+        columnas = COLUMNAS[numero]
+        respuesta = f"Campos del reporte {numero}:\n\n"
+        for num, nombre in columnas.items():
+            respuesta += f"{num}. {nombre}\n"
+        return {"respuesta": respuesta, "fuentes": [], "reporte": numero}
+
+    # Para otros reportes usar RAG
     fragmentos = buscar(f"reporte {numero} columnas campos secciones", top_k=10, reporte=numero)
     ctx, fuentes = construir_contexto(fragmentos)
     hist = construir_historial(historial or [])
