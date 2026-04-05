@@ -114,6 +114,7 @@ def guardar_mensaje(session_id, tipo, texto, fuentes=None, cmd=None):
 @app.post("/campo")
 def endpoint_campo(req: ConsultaRequest):
     try:
+        print(f"📥 Endpoint campo: {req.pregunta} | reporte: {req.reporte}")
         historial = obtener_historial(req.session_id)
         argumento = f"{req.pregunta} {req.reporte}".strip() if req.reporte else req.pregunta
 
@@ -123,11 +124,13 @@ def endpoint_campo(req: ConsultaRequest):
 
         return result
     except Exception as e:
+        print(f"❌ Error en campo: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/calculo")
 def endpoint_calculo(req: ConsultaRequest):
     try:
+        print(f"📥 Endpoint calculo: {req.pregunta} | reporte: {req.reporte}")
         historial = obtener_historial(req.session_id)
         argumento = f"{req.pregunta} {req.reporte}".strip() if req.reporte else req.pregunta
 
@@ -137,11 +140,13 @@ def endpoint_calculo(req: ConsultaRequest):
 
         return result
     except Exception as e:
+        print(f"❌ Error en calculo: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/reporte")
 def endpoint_reporte(req: ConsultaRequest):
     try:
+        print(f"📥 Endpoint reporte: {req.pregunta} | reporte: {req.reporte}")
         historial = obtener_historial(req.session_id)
 
         guardar_mensaje(req.session_id, "user", req.pregunta, cmd="reporte")
@@ -150,11 +155,13 @@ def endpoint_reporte(req: ConsultaRequest):
 
         return result
     except Exception as e:
+        print(f"❌ Error en reporte: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/consulta")
 def endpoint_consulta(req: ConsultaRequest):
     try:
+        print(f"📥 Endpoint consulta: {req.pregunta} | reporte: {req.reporte}")
         historial = obtener_historial(req.session_id)
 
         guardar_mensaje(req.session_id, "user", req.pregunta, cmd="consulta")
@@ -163,6 +170,7 @@ def endpoint_consulta(req: ConsultaRequest):
 
         return result
     except Exception as e:
+        print(f"❌ Error en consulta: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # ── Health ───────────────────────────────────────────────

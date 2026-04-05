@@ -1,6 +1,8 @@
 import os
 import json
+import hashlib
 import requests
+from datetime import datetime
 from dotenv import load_dotenv
 from pymongo import MongoClient
 from langchain_ollama import OllamaLLM
@@ -14,7 +16,8 @@ load_dotenv()
 
 mongo = MongoClient(os.getenv("MONGO_URI"))
 db = mongo[os.getenv("DB_NAME")]
-docs = db["documentos"]
+docs   = db["documentos"]
+cache  = db["cache"]
 
 VOYAGE_KEY          = os.getenv("VOYAGE_API_KEY")
 VOYAGE_EMBED_URL    = "https://ai.mongodb.com/v1/embeddings"
@@ -36,6 +39,46 @@ REGLAS = """REGLAS ESTRICTAS:
 - NUNCA des explicaciones fuera del formato solicitado"""
 
 # ══════════════════════════════════════════════════════════
+# CACHÉ
+# ══════════════════════════════════════════════════════════
+
+def cache_key(pregunta, cmd, reporte):
+    """Genera una clave única para la combinación pregunta+cmd+reporte"""
+    texto = f"{pregunta.lower().strip()}|{cmd}|{reporte or ''}"
+    return hashlib.md5(texto.encode()).hexdigest()
+
+
+def buscar_cache(pregunta, cmd, reporte):
+    """Busca en caché una respuesta previa"""
+    key = cache_key(pregunta, cmd, reporte)
+    print(f"🔎 Buscando cache: {cmd} | {pregunta[:40]}")
+    resultado = cache.find_one({"key": key})
+    if resultado:
+        print(f"⚡ Cache hit: {pregunta[:50]}")
+        return {"respuesta": resultado["respuesta"], "fuentes": resultado["fuentes"]}
+    return None
+
+
+def guardar_cache(pregunta, cmd, reporte, respuesta, fuentes):
+    """Guarda una respuesta en caché"""
+    key = cache_key(pregunta, cmd, reporte)
+    cache.update_one(
+        {"key": key},
+        {"$set": {
+            "key": key,
+            "pregunta": pregunta,
+            "cmd": cmd,
+            "reporte": reporte,
+            "respuesta": respuesta,
+            "fuentes": fuentes,
+            "timestamp": datetime.utcnow()
+        }},
+        upsert=True
+    )
+    print(f"💾 Cache guardado: {cmd} | {pregunta[:40]}")
+
+
+# ══════════════════════════════════════════════════════════
 # NÚCLEO
 # ══════════════════════════════════════════════════════════
 
@@ -51,7 +94,6 @@ def embedding(texto):
 
 
 def reranker(pregunta, fragmentos, top_k=5):
-    """Reordena fragmentos por relevancia real usando Voyage rerank-2.5"""
     if not fragmentos:
         return fragmentos
 
@@ -86,7 +128,6 @@ def reranker(pregunta, fragmentos, top_k=5):
 
 
 def expandir_query(pregunta):
-    """Reformula la pregunta en palabras clave técnicas para mejor búsqueda vectorial"""
     prompt = f"""[INST] Eres experto en regulación bancaria CNBV.
 Reformula esta pregunta en máximo 15 palabras clave técnicas para búsqueda en documentos regulatorios.
 Solo devuelve las palabras clave, sin explicación ni puntuación adicional.
@@ -100,7 +141,6 @@ PREGUNTA: {pregunta}
 
 
 def buscar(pregunta, top_k=5, reporte=None):
-    """Busca con Atlas Vector Search y reordena con Voyage Rerank"""
     vector = embedding(pregunta)
     candidatos = top_k * 4
 
@@ -165,7 +205,6 @@ def construir_historial(mensajes):
 
 
 def respuesta_campos_calculados(reporte):
-    """Lee el analisis JSON y devuelve solo los campos calculados"""
     try:
         with open(f"analisis_{reporte}.json", "r", encoding="utf-8") as f:
             analisis = json.load(f)
@@ -187,6 +226,12 @@ def respuesta_campos_calculados(reporte):
 
 def consultar_campo(argumento, historial=None):
     campo, reporte = resolver_campo(argumento)
+
+    # Buscar en caché
+    cached = buscar_cache(campo, "campo", reporte)
+    if cached:
+        return {**cached, "campo": campo, "reporte": reporte}
+
     fragmentos = buscar(f"{campo} origen descripcion reporte {reporte or ''}", reporte=reporte)
     ctx, fuentes = construir_contexto(fragmentos)
     hist = construir_historial(historial or [])
@@ -208,11 +253,19 @@ FRAGMENTOS:
 Responde SOLO en español con el formato de 5 líneas indicado.
 [/INST]"""
 
-    return {"respuesta": llm.invoke(prompt), "fuentes": fuentes, "campo": campo, "reporte": reporte}
+    respuesta = llm.invoke(prompt)
+    print(f"🔵 Guardando cache campo: {campo}")
+    guardar_cache(campo, "campo", reporte, respuesta, fuentes)
+    return {"respuesta": respuesta, "fuentes": fuentes, "campo": campo, "reporte": reporte}
 
 
 def consultar_calculo(argumento, historial=None):
     campo, reporte = resolver_campo(argumento)
+
+    cached = buscar_cache(campo, "calculo", reporte)
+    if cached:
+        return {**cached, "campo": campo}
+
     fragmentos = buscar(f"calcular {campo} formula metodologia", top_k=6, reporte=reporte)
     ctx, fuentes = construir_contexto(fragmentos)
     hist = construir_historial(historial or [])
@@ -235,7 +288,9 @@ FRAGMENTOS:
 Responde SOLO en español con el formato de 6 líneas indicado.
 [/INST]"""
 
-    return {"respuesta": llm.invoke(prompt), "fuentes": fuentes, "campo": campo}
+    respuesta = llm.invoke(prompt)
+    guardar_cache(campo, "calculo", reporte, respuesta, fuentes)
+    return {"respuesta": respuesta, "fuentes": fuentes, "campo": campo}
 
 
 def consultar_reporte(numero, historial=None):
@@ -247,6 +302,10 @@ def consultar_reporte(numero, historial=None):
         for num, nombre in columnas.items():
             respuesta += f"{num}. {nombre}\n"
         return {"respuesta": respuesta, "fuentes": [], "reporte": numero}
+
+    cached = buscar_cache(numero, "reporte", numero)
+    if cached:
+        return {**cached, "reporte": numero}
 
     fragmentos = buscar(f"reporte {numero} columnas campos secciones", top_k=6, reporte=numero)
     ctx, fuentes = construir_contexto(fragmentos)
@@ -268,13 +327,15 @@ FRAGMENTOS:
 Responde SOLO en español con la tabla indicada.
 [/INST]"""
 
-    return {"respuesta": llm.invoke(prompt), "fuentes": fuentes, "reporte": numero}
+    respuesta = llm.invoke(prompt)
+    guardar_cache(numero, "reporte", numero, respuesta, fuentes)
+    return {"respuesta": respuesta, "fuentes": fuentes, "reporte": numero}
 
 
 def consultar_libre(pregunta, reporte=None, historial=None):
     pregunta_lower = pregunta.lower()
 
-    # Caso especial: campos calculados de un reporte específico
+    # Caso especial: campos calculados
     reporte_mencionado = reporte
     if not reporte_mencionado:
         for r in ["0430", "0431", "0432"]:
@@ -287,9 +348,14 @@ def consultar_libre(pregunta, reporte=None, historial=None):
         if resp:
             return {"respuesta": resp, "fuentes": []}
 
+    # Buscar en caché
+    cached = buscar_cache(pregunta, "consulta", reporte)
+    if cached:
+        return cached
+
     # Flujo normal con query expansion
     query = expandir_query(pregunta)
-    fragmentos = buscar(query, reporte=reporte)
+    fragmentos = buscar(query, top_k=8, reporte=reporte)
     ctx, fuentes = construir_contexto(fragmentos)
     hist = construir_historial(historial or [])
 
@@ -308,4 +374,6 @@ PREGUNTA: {pregunta}
 Responde SOLO en español.
 [/INST]"""
 
-    return {"respuesta": llm.invoke(prompt), "fuentes": fuentes}
+    respuesta = llm.invoke(prompt)
+    guardar_cache(pregunta, "consulta", reporte, respuesta, fuentes)
+    return {"respuesta": respuesta, "fuentes": fuentes}
