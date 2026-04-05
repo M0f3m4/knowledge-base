@@ -173,6 +173,32 @@ def endpoint_consulta(req: ConsultaRequest):
         print(f"❌ Error en consulta: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+# ── Endpoint Feedback ───────────────────────────────────
+class FeedbackRequest(BaseModel):
+    session_id: str
+    pregunta: str
+    respuesta: str
+    cmd: str
+    reporte: str = None
+    voto: str  # "up" o "down"
+
+@app.post("/feedback")
+def endpoint_feedback(req: FeedbackRequest):
+    try:
+        db["feedback"].insert_one({
+            "session_id": req.session_id,
+            "pregunta": req.pregunta,
+            "respuesta": req.respuesta,
+            "cmd": req.cmd,
+            "reporte": req.reporte,
+            "voto": req.voto,
+            "timestamp": datetime.utcnow()
+        })
+        print(f"{'👍' if req.voto == 'up' else '👎'} Feedback {req.voto}: {req.pregunta[:40]}")
+        return {"ok": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 # ── Health ───────────────────────────────────────────────
 @app.get("/")
 def root():

@@ -4,252 +4,278 @@ import "./App.css"
 
 const API = "http://localhost:8000"
 
-const COMANDOS = [
-  { id: "consulta", label: "Consulta", placeholder: "¿Qué campos son obligatorios en el 0430?" },
-  { id: "campo",   label: "Campo",    placeholder: "RFC  o  20" },
-  { id: "calculo", label: "Cálculo",  placeholder: "municipio  o  20" },
-  { id: "reporte", label: "Reporte",  placeholder: "Selecciona el reporte arriba" },
+const CMDS = [
+  { id: "consulta", label: "Consulta", ph: "¿Cuál es el objetivo del reporte 0430?" },
+  { id: "campo",    label: "Campo",    ph: "RFC  /  20  /  municipio" },
+  { id: "calculo",  label: "Cálculo",  ph: "20  /  municipio destino" },
+  { id: "reporte",  label: "Reporte",  ph: "Selecciona el reporte arriba" },
+]
+
+const REPORTES = [
+  { value: "",     label: "Todos" },
+  { value: "0430", label: "0430 · Altas" },
+  { value: "0431", label: "0431 · Seguimiento" },
+  { value: "0432", label: "0432 · Bajas" },
 ]
 
 function Fuentes({ fuentes }) {
-  if (!fuentes || fuentes.length === 0) return null
-  const unicas = [...new Map(fuentes.map(f => [`${f.fuente}_${f.pagina}`, f])).values()]
+  if (!fuentes?.length) return null
+  const u = [...new Map(fuentes.map(f => [`${f.fuente}_${f.pagina}`, f])).values()]
   return (
     <div className="fuentes">
-      <span className="fuentes-label">📋</span>
-      {unicas.map((f, i) => (
-        <span key={i} className="fuente-tag">
-          {f.fuente.split("_")[0]}… p.{f.pagina}
+      {u.map((f, i) => (
+        <span key={i} className="ftag">
+          {f.fuente.split("_")[0].slice(0, 12)}… p{f.pagina}
         </span>
       ))}
     </div>
   )
 }
 
-function Mensaje({ msg }) {
+function Burbuja({ m, onFeedback }) {
+  const [voto, setVoto] = useState(null)
+
+  const votar = async (v) => {
+    if (voto) return
+    setVoto(v)
+    onFeedback && onFeedback(m, v)
+  }
+
   return (
-    <div className={`msg msg-${msg.tipo}`}>
-      <div className="msg-meta">
-        <span className="msg-icon">{msg.tipo === "user" ? "👤" : "🏦"}</span>
-        <span className="msg-quien">{msg.tipo === "user" ? "Tú" : "CNBV KB"}</span>
-        {msg.cmd && <span className="msg-cmd">{msg.cmd}</span>}
+    <div className={`burbuja ${m.tipo}`}>
+      {m.tipo === "bot" && <div className="bot-label">CNBV</div>}
+      <div className="burbuja-inner">
+        <pre>{m.texto}</pre>
+        <Fuentes fuentes={m.fuentes} />
+        {m.tipo === "bot" && m.texto !== "¿En qué puedo ayudarte?" && m.texto !== "Sesión vacía. ¿En qué puedo ayudarte?" && (
+          <div className="feedback">
+            <button
+              className={`fvoto ${voto === "up" ? "active-up" : ""}`}
+              onClick={() => votar("up")}
+              disabled={!!voto}
+              title="Buena respuesta"
+            >
+              {voto === "up" ? "👍" : "↑"}
+            </button>
+            <button
+              className={`fvoto ${voto === "down" ? "active-down" : ""}`}
+              onClick={() => votar("down")}
+              disabled={!!voto}
+              title="Mala respuesta"
+            >
+              {voto === "down" ? "👎" : "↓"}
+            </button>
+          </div>
+        )}
       </div>
-      <div className="msg-cuerpo">
-        <pre>{msg.texto}</pre>
-        {msg.fuentes && <Fuentes fuentes={msg.fuentes} />}
+    </div>
+  )
+}
+
+function Dots() {
+  return (
+    <div className="burbuja bot">
+      <div className="bot-label">CNBV</div>
+      <div className="burbuja-inner">
+        <div className="typing"><span/><span/><span/></div>
       </div>
     </div>
   )
 }
 
 export default function App() {
-  const [sesiones, setSesiones] = useState([])
-  const [sessionId, setSessionId] = useState(null)
-  const [mensajes, setMensajes] = useState([])
-  const [input, setInput] = useState("")
-  const [cmd, setCmd] = useState("consulta")
-  const [reporte, setReporte] = useState("0430")
-  const [cargando, setCargando] = useState(false)
-  const [editando, setEditando] = useState(null)
-  const [nuevoNombre, setNuevoNombre] = useState("")
-  const bottomRef = useRef(null)
+  const [sesiones, setSesiones]   = useState([])
+  const [sid, setSid]             = useState(null)
+  const [msgs, setMsgs]           = useState([])
+  const [input, setInput]         = useState("")
+  const [cmd, setCmd]             = useState("consulta")
+  const [reporte, setReporte]     = useState("0430")
+  const [cargando, setCargando]   = useState(false)
+  const [editId, setEditId]       = useState(null)
+  const [editVal, setEditVal]     = useState("")
+  const [sideOpen, setSideOpen]   = useState(true)
+  const bottom = useRef(null)
+  const lastUserMsg = useRef(null)
 
-  useEffect(() => {
-    cargarSesiones()
-  }, [])
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [mensajes])
+  useEffect(() => { cargarSesiones() }, [])
+  useEffect(() => { bottom.current?.scrollIntoView({ behavior: "smooth" }) }, [msgs, cargando])
 
   const cargarSesiones = async () => {
-    const res = await axios.get(`${API}/sesiones`)
-    setSesiones(res.data)
+    const r = await axios.get(`${API}/sesiones`)
+    setSesiones(r.data)
   }
 
   const nuevaSesion = async () => {
-    const nombre = `Sesión ${new Date().toLocaleDateString("es-MX", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}`
-    const res = await axios.post(`${API}/sesiones`, { nombre })
-    setSesiones(prev => [res.data, ...prev])
-    setSessionId(res.data.id)
-    setMensajes([{
-      tipo: "bot",
-      texto: "Nueva sesión iniciada. ¿En qué puedo ayudarte?",
-      fuentes: null
-    }])
+    const nombre = `Sesión ${new Date().toLocaleString("es-MX", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}`
+    const r = await axios.post(`${API}/sesiones`, { nombre })
+    setSesiones(p => [r.data, ...p])
+    setSid(r.data.id)
+    setMsgs([{ tipo: "bot", texto: "¿En qué puedo ayudarte?", fuentes: null }])
   }
 
-  const seleccionarSesion = async (id) => {
-    setSessionId(id)
-    const res = await axios.get(`${API}/sesiones/${id}/mensajes`)
-    if (res.data.length === 0) {
-      setMensajes([{ tipo: "bot", texto: "Sesión vacía. ¿En qué puedo ayudarte?", fuentes: null }])
-    } else {
-      setMensajes(res.data)
-    }
+  const selSesion = async (id) => {
+    setSid(id)
+    const r = await axios.get(`${API}/sesiones/${id}/mensajes`)
+    setMsgs(r.data.length ? r.data : [{ tipo: "bot", texto: "Sesión vacía. ¿En qué puedo ayudarte?", fuentes: null }])
   }
 
-  const eliminarSesion = async (e, id) => {
+  const delSesion = async (e, id) => {
     e.stopPropagation()
     await axios.delete(`${API}/sesiones/${id}`)
-    setSesiones(prev => prev.filter(s => s.id !== id))
-    if (sessionId === id) {
-      setSessionId(null)
-      setMensajes([])
-    }
+    setSesiones(p => p.filter(s => s.id !== id))
+    if (sid === id) { setSid(null); setMsgs([]) }
   }
 
-  const renombrarSesion = async (e, id) => {
+  const renombrar = async (e, id) => {
     e.stopPropagation()
-    if (!nuevoNombre.trim()) return
-    await axios.put(`${API}/sesiones/${id}`, { nombre: nuevoNombre })
-    setSesiones(prev => prev.map(s => s.id === id ? { ...s, nombre: nuevoNombre } : s))
-    setEditando(null)
-    setNuevoNombre("")
+    if (!editVal.trim()) return
+    await axios.put(`${API}/sesiones/${id}`, { nombre: editVal })
+    setSesiones(p => p.map(s => s.id === id ? { ...s, nombre: editVal } : s))
+    setEditId(null); setEditVal("")
   }
 
   const enviar = async () => {
-    if (!input.trim() || cargando || !sessionId) return
-    const pregunta = input.trim()
+    if (!input.trim() || cargando || !sid) return
+    const q = input.trim()
     setInput("")
-
-    const msgUser = { tipo: "user", texto: pregunta, cmd, fuentes: null }
-    setMensajes(prev => [...prev, msgUser])
+    setMsgs(p => [...p, { tipo: "user", texto: q, cmd, fuentes: null }])
     setCargando(true)
 
     try {
-      const body = { pregunta, reporte: reporte || null, session_id: sessionId }
-      let res
+      const body = { pregunta: q, reporte: reporte || null, session_id: sid }
+      let r
+      if (cmd === "consulta") r = await axios.post(`${API}/consulta`, body)
+      else if (cmd === "campo")   r = await axios.post(`${API}/campo`, body)
+      else if (cmd === "calculo") r = await axios.post(`${API}/calculo`, body)
+      else if (cmd === "reporte") r = await axios.post(`${API}/reporte`, { ...body, pregunta: reporte || q })
 
-      if (cmd === "consulta") res = await axios.post(`${API}/consulta`, body)
-      else if (cmd === "campo")   res = await axios.post(`${API}/campo`, body)
-      else if (cmd === "calculo") res = await axios.post(`${API}/calculo`, body)
-      else if (cmd === "reporte") res = await axios.post(`${API}/reporte`, { ...body, pregunta: reporte || pregunta })
+      setMsgs(p => [...p, { tipo: "bot", texto: r.data.respuesta, fuentes: r.data.fuentes }])
 
-      setMensajes(prev => [...prev, {
-        tipo: "bot",
-        texto: res.data.respuesta,
-        fuentes: res.data.fuentes,
-        cmd: null
-      }])
-
-      // Actualizar nombre de sesión con la primera pregunta
-      const sesion = sesiones.find(s => s.id === sessionId)
-      if (sesion && sesion.nombre.startsWith("Sesión")) {
-        const nombre = pregunta.slice(0, 40) + (pregunta.length > 40 ? "..." : "")
-        await axios.put(`${API}/sesiones/${sessionId}`, { nombre })
-        setSesiones(prev => prev.map(s => s.id === sessionId ? { ...s, nombre } : s))
+      const s = sesiones.find(x => x.id === sid)
+      if (s?.nombre.startsWith("Sesión")) {
+        const n = q.slice(0, 38) + (q.length > 38 ? "…" : "")
+        await axios.put(`${API}/sesiones/${sid}`, { nombre: n })
+        setSesiones(p => p.map(x => x.id === sid ? { ...x, nombre: n } : x))
       }
-    } catch (err) {
-      setMensajes(prev => [...prev, {
-        tipo: "bot",
-        texto: `❌ ${err.response?.data?.detail || err.message}`,
-        fuentes: null
-      }])
+    } catch (e) {
+      setMsgs(p => [...p, { tipo: "bot", texto: `Error: ${e.response?.data?.detail || e.message}`, fuentes: null }])
     } finally {
       setCargando(false)
     }
   }
 
-  const formatFecha = (fecha) => {
-    if (!fecha) return ""
-    return new Date(fecha).toLocaleDateString("es-MX", {
-      day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit"
-    })
-  }
+  const nomSesion = sesiones.find(s => s.id === sid)?.nombre || ""
 
   return (
-    <div className="app">
-      {/* Panel de sesiones */}
-      <aside className="sidebar">
-        <div className="sidebar-header">
-          <span className="sidebar-title">🏦 CNBV KB</span>
-          <button className="btn-nueva" onClick={nuevaSesion}>+ Nueva</button>
+    <div className="shell">
+      {/* Logo */}
+      <div className="logo-bar">
+        <img src="/logo.png" alt="Bajaware" className="logo-img" />
+      </div>
+
+      {/* Sidebar */}
+      <aside className={`side ${sideOpen ? "open" : "closed"}`}>
+        <div className="side-top">
+          <button className="toggle-side" onClick={() => setSideOpen(p => !p)}>
+            {sideOpen ? "←" : "→"}
+          </button>
+          {sideOpen && <button className="btn-new" onClick={nuevaSesion}>+ Nueva</button>}
         </div>
-        <div className="sesiones-lista">
-          {sesiones.length === 0 && (
-            <p className="sidebar-empty">Sin sesiones.<br />Crea una nueva.</p>
-          )}
-          {sesiones.map(s => (
-            <div
-              key={s.id}
-              className={`sesion-item ${sessionId === s.id ? "sesion-activa" : ""}`}
-              onClick={() => seleccionarSesion(s.id)}
-            >
-              {editando === s.id ? (
-                <input
-                  className="sesion-edit"
-                  value={nuevoNombre}
-                  onChange={e => setNuevoNombre(e.target.value)}
-                  onKeyDown={e => { if (e.key === "Enter") renombrarSesion(e, s.id) }}
-                  onBlur={e => renombrarSesion(e, s.id)}
-                  autoFocus
-                  onClick={e => e.stopPropagation()}
-                />
-              ) : (
-                <>
-                  <div className="sesion-info">
-                    <span className="sesion-nombre">{s.nombre}</span>
-                    <span className="sesion-fecha">{formatFecha(s.updated_at)}</span>
-                  </div>
-                  <div className="sesion-acciones">
-                    <button onClick={e => { e.stopPropagation(); setEditando(s.id); setNuevoNombre(s.nombre) }} title="Renombrar">✏️</button>
-                    <button onClick={e => eliminarSesion(e, s.id)} title="Eliminar">🗑️</button>
-                  </div>
-                </>
-              )}
-            </div>
-          ))}
-        </div>
+
+        {sideOpen && (
+          <div className="side-list">
+            {sesiones.length === 0 && <p className="side-empty">Sin sesiones</p>}
+            {sesiones.map(s => (
+              <div
+                key={s.id}
+                className={`sitem ${sid === s.id ? "active" : ""}`}
+                onClick={() => selSesion(s.id)}
+              >
+                {editId === s.id ? (
+                  <input
+                    className="sedit"
+                    value={editVal}
+                    onChange={e => setEditVal(e.target.value)}
+                    onKeyDown={e => e.key === "Enter" && renombrar(e, s.id)}
+                    onBlur={e => renombrar(e, s.id)}
+                    onClick={e => e.stopPropagation()}
+                    autoFocus
+                  />
+                ) : (
+                  <>
+                    <span className="sname">{s.nombre}</span>
+                    <div className="sactions">
+                      <button onClick={e => { e.stopPropagation(); setEditId(s.id); setEditVal(s.nombre) }}>✎</button>
+                      <button onClick={e => delSesion(e, s.id)}>×</button>
+                    </div>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </aside>
 
-      {/* Panel principal */}
+      {/* Main */}
       <div className="main">
-        <header className="header">
-          <div className="header-inner">
-            <span className="header-titulo">
-              {sessionId ? sesiones.find(s => s.id === sessionId)?.nombre || "Sesión" : "Selecciona o crea una sesión"}
-            </span>
-            <select className="reporte-select" value={reporte} onChange={e => setReporte(e.target.value)}>
-              <option value="">Todos</option>
-              <option value="0430">0430 — Altas</option>
-              <option value="0431">0431 — Seguimiento</option>
-              <option value="0432">0432 — Bajas</option>
-            </select>
+        {/* Top bar */}
+        <header className="topbar">
+          <div className="topbar-left">
+            <span className="logo-mark">◈</span>
+            <span className="session-name">{nomSesion || "Knowledge Base CNBV"}</span>
           </div>
+          <select className="rep-sel" value={reporte} onChange={e => setReporte(e.target.value)}>
+            {REPORTES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+          </select>
         </header>
 
+        {/* Chat */}
         <div className="chat">
-          {!sessionId ? (
-            <div className="chat-empty">
-              <p>👈 Selecciona una sesión o crea una nueva</p>
+          {!sid ? (
+            <div className="empty-state">
+              <div className="empty-icon">◈</div>
+              <p>Crea o selecciona una sesión para comenzar</p>
+              <button className="btn-start" onClick={nuevaSesion}>Nueva sesión</button>
             </div>
           ) : (
             <>
-              {mensajes.map((m, i) => <Mensaje key={i} msg={m} />)}
-              {cargando && (
-                <div className="msg msg-bot">
-                  <div className="msg-meta">
-                    <span className="msg-icon">🏦</span>
-                    <span className="msg-quien">CNBV KB</span>
-                  </div>
-                  <div className="msg-cuerpo">
-                    <div className="dots"><span /><span /><span /></div>
-                  </div>
-                </div>
-              )}
-              <div ref={bottomRef} />
+              {msgs.map((m, i) => {
+                if (m.tipo === "user") lastUserMsg.current = m
+                return (
+                  <Burbuja
+                    key={i}
+                    m={m}
+                    onFeedback={async (msg, voto) => {
+                      try {
+                        await axios.post(`${API}/feedback`, {
+                          session_id: sid,
+                          pregunta: lastUserMsg.current?.texto || "",
+                          respuesta: msg.texto,
+                          cmd: lastUserMsg.current?.cmd || "consulta",
+                          reporte: reporte || null,
+                          voto
+                        })
+                      } catch (e) {
+                        console.error("Feedback error:", e)
+                      }
+                    }}
+                  />
+                )
+              })}
+              {cargando && <Dots />}
+              <div ref={bottom} />
             </>
           )}
         </div>
 
-        {sessionId && (
-          <footer className="footer">
-            <div className="cmds">
-              {COMANDOS.map(c => (
+        {/* Input */}
+        {sid && (
+          <div className="inputbar">
+            <div className="cmd-row">
+              {CMDS.map(c => (
                 <button
                   key={c.id}
-                  className={`cmd ${cmd === c.id ? "cmd-active" : ""}`}
+                  className={`ctab ${cmd === c.id ? "on" : ""}`}
                   onClick={() => setCmd(c.id)}
                 >
                   {c.label}
@@ -260,16 +286,16 @@ export default function App() {
               <textarea
                 value={input}
                 onChange={e => setInput(e.target.value)}
-                onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviar() } }}
-                placeholder={COMANDOS.find(c => c.id === cmd)?.placeholder}
+                onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviar() }}}
+                placeholder={CMDS.find(c => c.id === cmd)?.ph}
                 rows={2}
                 disabled={cargando}
               />
-              <button className="send" onClick={enviar} disabled={cargando || !input.trim()}>
-                {cargando ? "⏳" : "→"}
+              <button className="send-btn" onClick={enviar} disabled={cargando || !input.trim()}>
+                ↑
               </button>
             </div>
-          </footer>
+          </div>
         )}
       </div>
     </div>
