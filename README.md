@@ -25,7 +25,8 @@ https://www.python.org/downloads/release/python-3120/
 
 > ⚠️ Usa Python 3.12 — algunas dependencias no son compatibles con Python 3.13+
 
-Activa **"Add Python to PATH"** durante la instalación (Windows) o instala via Homebrew (Mac):
+**Windows:** Activa "Add Python to PATH" durante la instalación.  
+**Mac:**
 ```bash
 brew install python@3.12
 ```
@@ -41,8 +42,12 @@ ollama pull mistral:7b-instruct
 ```
 
 ### 5. Git
-Windows: https://git-scm.com  
-Mac: `brew install git`
+
+**Windows:** https://git-scm.com  
+**Mac:**
+```bash
+brew install git
+```
 
 ---
 
@@ -70,7 +75,7 @@ source venv/bin/activate
 
 ### 3. Instalar dependencias Python
 ```bash
-pip install fastapi uvicorn pymongo python-dotenv langchain-ollama langchain-community langchain-text-splitters pdfplumber anthropic requests
+pip install fastapi uvicorn pymongo python-dotenv langchain-ollama langchain-community langchain-text-splitters pdfplumber requests
 ```
 
 ### 4. Instalar dependencias del frontend
@@ -157,6 +162,9 @@ Filtra por reporte usando el selector en la barra superior.
 ### Feedback
 Cada respuesta tiene botones ↑ ↓ para calificarla. El feedback se guarda en MongoDB para análisis de calidad.
 
+### Dashboard
+Accede desde el botón **Dashboard** en la barra superior para ver métricas de feedback, respuestas positivas y negativas agrupadas por comando.
+
 ---
 
 ## Arquitectura RAG
@@ -185,11 +193,13 @@ knowledge-base/
 ├── knowledge-base-ui/       # Frontend React + Vite
 │   └── src/
 │       ├── App.jsx
-│       └── App.css
+│       ├── App.css
+│       ├── Dashboard.jsx
+│       ├── Dashboard.css
+│       └── main.jsx
 ├── Api.py                   # Backend FastAPI
 ├── Consultar.py             # Motor RAG (búsqueda + reranking + respuesta)
 ├── cargar_docs.py           # Carga PDFs a MongoDB Atlas con Voyage
-├── analizar_campos.py       # Clasificación de campos con Claude API
 ├── columnas_0430.py         # Mapa de las 53 columnas del reporte 0430
 ├── analisis_0430.json       # Clasificación CALCULADO/CATALOGO/MANUAL
 ├── .env                     # Variables de entorno (no incluido en repo)
