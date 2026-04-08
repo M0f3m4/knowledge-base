@@ -22,27 +22,85 @@ function StatCard({ label, value, sub }) {
   )
 }
 
-function FeedbackRow({ item }) {
-  const [expanded, setExpanded] = useState(false)
+function FeedbackRow({ item, showEdit }) {
+  const [expanded, setExpanded]   = useState(false)
+  const [editing, setEditing]     = useState(false)
+  const [editVal, setEditVal]     = useState(item.respuesta || "")
+  const [guardado, setGuardado]   = useState(false)
+  const [guardando, setGuardando] = useState(false)
+
   const fecha = item.timestamp ? new Date(item.timestamp).toLocaleDateString("es-MX", {
     day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit"
   }) : ""
 
+  const guardarEdicion = async () => {
+    if (!editVal.trim()) return
+    setGuardando(true)
+    try {
+      await axios.put(`${API}/cache/editar`, {
+        pregunta: item.pregunta,
+        cmd: item.cmd || "consulta",
+        reporte: item.reporte || null,
+        respuesta_corregida: editVal
+      })
+      setGuardado(true)
+      setEditing(false)
+    } catch (e) {
+      console.error("Error guardando:", e)
+    } finally {
+      setGuardando(false)
+    }
+  }
+
   return (
-    <div className="fb-row" onClick={() => setExpanded(p => !p)}>
-      <div className="fb-top">
+    <div className="fb-row">
+      <div className="fb-top" onClick={() => setExpanded(p => !p)} style={{cursor:"pointer"}}>
         <div className="fb-meta">
           <span className="fb-cmd">{CMD_LABELS[item.cmd] || item.cmd}</span>
           {item.reporte && <span className="fb-rep">{item.reporte}</span>}
           <span className="fb-fecha">{fecha}</span>
+          {guardado && <span className="fb-saved">✓ guardado en caché</span>}
         </div>
         <span className="fb-toggle">{expanded ? "−" : "+"}</span>
       </div>
+
       <div className="fb-pregunta">{item.pregunta}</div>
+
       {expanded && (
         <div className="fb-respuesta">
-          <div className="fb-resp-label">Respuesta:</div>
-          <pre>{item.respuesta}</pre>
+          <div className="fb-resp-header">
+            <div className="fb-resp-label">Respuesta:</div>
+            {showEdit && !editing && (
+              <button className="btn-edit" onClick={() => setEditing(true)}>
+                ✎ Editar y guardar en caché
+              </button>
+            )}
+          </div>
+
+          {editing ? (
+            <div className="edit-area">
+              <textarea
+                value={editVal}
+                onChange={e => setEditVal(e.target.value)}
+                rows={8}
+                className="edit-textarea"
+              />
+              <div className="edit-actions">
+                <button
+                  className="btn-save"
+                  onClick={guardarEdicion}
+                  disabled={guardando}
+                >
+                  {guardando ? "Guardando..." : "Guardar en caché"}
+                </button>
+                <button className="btn-cancel" onClick={() => { setEditing(false); setEditVal(item.respuesta) }}>
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          ) : (
+            <pre className={guardado ? "resp-editada" : ""}>{guardado ? editVal : item.respuesta}</pre>
+          )}
         </div>
       )}
     </div>
@@ -51,8 +109,8 @@ function FeedbackRow({ item }) {
 
 export default function Dashboard() {
   const navigate = useNavigate()
-  const [data, setData] = useState(null)
-  const [tab, setTab] = useState("down")
+  const [data, setData]       = useState(null)
+  const [tab, setTab]         = useState("down")
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -61,12 +119,11 @@ export default function Dashboard() {
       .catch(() => setLoading(false))
   }, [])
 
-  const total = data ? data.total_up + data.total_down : 0
+  const total  = data ? data.total_up + data.total_down : 0
   const pct_up = total > 0 ? Math.round((data.total_up / total) * 100) : 0
 
   return (
     <div className="dash-shell">
-      {/* Header */}
       <header className="dash-header">
         <div className="dash-header-left">
           <img src="/logo.png" alt="Bajaware" className="dash-logo" />
@@ -123,12 +180,12 @@ export default function Dashboard() {
               {tab === "down" && (
                 data.negativos.length === 0
                   ? <p className="empty-msg">Sin respuestas negativas 🎉</p>
-                  : data.negativos.map((item, i) => <FeedbackRow key={i} item={item} />)
+                  : data.negativos.map((item, i) => <FeedbackRow key={i} item={item} showEdit={true} />)
               )}
               {tab === "up" && (
                 data.positivos.length === 0
                   ? <p className="empty-msg">Sin respuestas positivas aún</p>
-                  : data.positivos.map((item, i) => <FeedbackRow key={i} item={item} />)
+                  : data.positivos.map((item, i) => <FeedbackRow key={i} item={item} showEdit={false} />)
               )}
             </div>
           </div>

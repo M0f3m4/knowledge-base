@@ -230,6 +230,39 @@ def dashboard_feedback():
         print(f"❌ Dashboard error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
+# ── Editar caché ──────────────────────────────────────────
+class CacheEditRequest(BaseModel):
+    pregunta: str
+    cmd: str
+    reporte: str = None
+    respuesta_corregida: str
+
+@app.put("/cache/editar")
+def editar_cache(req: CacheEditRequest):
+    try:
+        import hashlib
+        texto = f"{req.pregunta.lower().strip()}|{req.cmd}|{req.reporte or ''}"
+        key = hashlib.md5(texto.encode()).hexdigest()
+        db["cache"].update_one(
+            {"key": key},
+            {"$set": {
+                "key": key,
+                "pregunta": req.pregunta,
+                "cmd": req.cmd,
+                "reporte": req.reporte,
+                "respuesta": req.respuesta_corregida,
+                "editado": True,
+                "timestamp": datetime.utcnow()
+            }},
+            upsert=True
+        )
+        print(f"✏️ Cache editado: {req.pregunta[:40]}")
+        return {"ok": True}
+    except Exception as e:
+        print(f"❌ Error editar cache: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # ── Health ────────────────────────────────────────────────
 @app.get("/")
 def root():

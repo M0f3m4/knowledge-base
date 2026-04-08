@@ -272,3 +272,96 @@
   text-align: center;
   padding: 32px;
 }
+
+/* ── Edit area ── */
+.fb-resp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.btn-edit {
+  background: none;
+  border: 1px solid #2a2a2a;
+  color: #555;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-family: 'Geist Mono', monospace;
+  cursor: pointer;
+  transition: all .15s;
+}
+
+.btn-edit:hover { border-color: #555; color: #e8e8e8; }
+
+.edit-area {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.edit-textarea {
+  background: #161616;
+  border: 1px solid #2a2a2a;
+  color: #e8e8e8;
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-family: 'Geist Mono', monospace;
+  font-size: 11px;
+  line-height: 1.6;
+  resize: vertical;
+  outline: none;
+  width: 100%;
+  transition: border-color .15s;
+}
+
+.edit-textarea:focus { border-color: #555; }
+
+.edit-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-save {
+  background: #e8e8e8;
+  border: none;
+  color: #080808;
+  padding: 6px 14px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-family: 'Geist Mono', monospace;
+  cursor: pointer;
+  transition: opacity .15s;
+}
+
+.btn-save:hover:not(:disabled) { opacity: .85; }
+.btn-save:disabled { opacity: .4; cursor: not-allowed; }
+
+.btn-cancel {
+  background: none;
+  border: 1px solid #222;
+  color: #555;
+  padding: 6px 14px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-family: 'Geist Mono', monospace;
+  cursor: pointer;
+  transition: all .15s;
+}
+
+.btn-cancel:hover { border-color: #555; color: #e8e8e8; }
+
+.fb-saved {
+  font-size: 10px;
+  color: #4ade80;
+  font-family: 'Geist Mono', monospace;
+}
+
+.resp-editada {
+  font-family: 'Geist Mono', monospace;
+  font-size: 11px;
+  color: #4ade80;
+  white-space: pre-wrap;
+  line-height: 1.6;
+}
