@@ -496,3 +496,19 @@ textarea:disabled { opacity: .4; }
 .fvoto:disabled { cursor: default; }
 .fvoto.active-up   { border-color: #4ade80; color: #4ade80; }
 .fvoto.active-down { border-color: #f87171; color: #f87171; }
+
+/* ── Dashboard button ── */
+.dash-btn {
+  background: none;
+  border: 1px solid var(--border2);
+  color: var(--text2);
+  padding: 5px 12px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-family: 'Geist Mono', monospace;
+  cursor: pointer;
+  transition: all .15s;
+  white-space: nowrap;
+}
+
+.dash-btn:hover { border-color: var(--text); color: var(--text); }

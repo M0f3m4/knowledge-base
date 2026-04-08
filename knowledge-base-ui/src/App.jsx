@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react"
+import { useNavigate } from "react-router-dom"
 import axios from "axios"
 import "./App.css"
 
@@ -94,6 +95,7 @@ export default function App() {
   const [editId, setEditId]       = useState(null)
   const [editVal, setEditVal]     = useState("")
   const [sideOpen, setSideOpen]   = useState(true)
+  const navigate = useNavigate()
   const bottom = useRef(null)
   const lastUserMsg = useRef(null)
 
@@ -224,9 +226,12 @@ export default function App() {
             <span className="logo-mark">◈</span>
             <span className="session-name">{nomSesion || "Knowledge Base CNBV"}</span>
           </div>
+          <div style={{display:"flex",gap:"8px",alignItems:"center"}}>
+          <button className="dash-btn" onClick={() => navigate("/dashboard")}>Dashboard</button>
           <select className="rep-sel" value={reporte} onChange={e => setReporte(e.target.value)}>
             {REPORTES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
           </select>
+          </div>
         </header>
 
         {/* Chat */}

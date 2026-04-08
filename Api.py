@@ -15,7 +15,6 @@ from Consultar import (
 
 load_dotenv()
 
-# ── App ──────────────────────────────────────────────────
 app = FastAPI(title="Knowledge Base CNBV")
 
 app.add_middleware(
@@ -25,13 +24,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ── MongoDB ──────────────────────────────────────────────
 mongo = MongoClient(os.getenv("MONGO_URI"))
 db = mongo[os.getenv("DB_NAME")]
 sesiones = db["sesiones"]
 mensajes = db["mensajes"]
 
-# ── Helpers ──────────────────────────────────────────────
 def str_id(obj):
     obj["id"] = str(obj.pop("_id"))
     return obj
@@ -42,7 +39,6 @@ def obtener_historial(session_id, limite=6):
         {"tipo": 1, "texto": 1, "_id": 0}
     ).sort("timestamp", -1).limit(limite))[::-1]
 
-# ── Modelos ──────────────────────────────────────────────
 class SesionCreate(BaseModel):
     nombre: str
 
@@ -54,7 +50,15 @@ class ConsultaRequest(BaseModel):
     reporte: str = None
     session_id: str
 
-# ── Endpoints de Sesiones ────────────────────────────────
+class FeedbackRequest(BaseModel):
+    session_id: str
+    pregunta: str
+    respuesta: str
+    cmd: str
+    reporte: str = None
+    voto: str
+
+# ── Sesiones ─────────────────────────────────────────────
 @app.get("/sesiones")
 def listar_sesiones():
     result = list(sesiones.find().sort("updated_at", -1))
@@ -63,11 +67,7 @@ def listar_sesiones():
 @app.post("/sesiones")
 def crear_sesion(body: SesionCreate):
     now = datetime.utcnow()
-    doc = {
-        "nombre": body.nombre,
-        "created_at": now,
-        "updated_at": now
-    }
+    doc = {"nombre": body.nombre, "created_at": now, "updated_at": now}
     result = sesiones.insert_one(doc)
     doc["id"] = str(result.inserted_id)
     doc.pop("_id", None)
@@ -95,7 +95,6 @@ def obtener_mensajes(session_id: str):
     ).sort("timestamp", 1))
     return result
 
-# ── Helpers para guardar mensajes ────────────────────────
 def guardar_mensaje(session_id, tipo, texto, fuentes=None, cmd=None):
     mensajes.insert_one({
         "session_id": session_id,
@@ -110,78 +109,62 @@ def guardar_mensaje(session_id, tipo, texto, fuentes=None, cmd=None):
         {"$set": {"updated_at": datetime.utcnow()}}
     )
 
-# ── Endpoints de Consulta ────────────────────────────────
+# ── Consultas ─────────────────────────────────────────────
 @app.post("/campo")
 def endpoint_campo(req: ConsultaRequest):
     try:
-        print(f"📥 Endpoint campo: {req.pregunta} | reporte: {req.reporte}")
+        print(f"📥 campo: {req.pregunta} | {req.reporte}")
         historial = obtener_historial(req.session_id)
         argumento = f"{req.pregunta} {req.reporte}".strip() if req.reporte else req.pregunta
-
         guardar_mensaje(req.session_id, "user", req.pregunta, cmd="campo")
         result = consultar_campo(argumento, historial=historial)
         guardar_mensaje(req.session_id, "bot", result["respuesta"], result.get("fuentes"), cmd="campo")
-
         return result
     except Exception as e:
-        print(f"❌ Error en campo: {e}")
+        print(f"❌ Error campo: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/calculo")
 def endpoint_calculo(req: ConsultaRequest):
     try:
-        print(f"📥 Endpoint calculo: {req.pregunta} | reporte: {req.reporte}")
+        print(f"📥 calculo: {req.pregunta} | {req.reporte}")
         historial = obtener_historial(req.session_id)
         argumento = f"{req.pregunta} {req.reporte}".strip() if req.reporte else req.pregunta
-
         guardar_mensaje(req.session_id, "user", req.pregunta, cmd="calculo")
         result = consultar_calculo(argumento, historial=historial)
         guardar_mensaje(req.session_id, "bot", result["respuesta"], result.get("fuentes"), cmd="calculo")
-
         return result
     except Exception as e:
-        print(f"❌ Error en calculo: {e}")
+        print(f"❌ Error calculo: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/reporte")
 def endpoint_reporte(req: ConsultaRequest):
     try:
-        print(f"📥 Endpoint reporte: {req.pregunta} | reporte: {req.reporte}")
+        print(f"📥 reporte: {req.reporte}")
         historial = obtener_historial(req.session_id)
-
         guardar_mensaje(req.session_id, "user", req.pregunta, cmd="reporte")
         result = consultar_reporte(req.reporte or req.pregunta, historial=historial)
         guardar_mensaje(req.session_id, "bot", result["respuesta"], result.get("fuentes"), cmd="reporte")
-
         return result
     except Exception as e:
-        print(f"❌ Error en reporte: {e}")
+        print(f"❌ Error reporte: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/consulta")
 def endpoint_consulta(req: ConsultaRequest):
     try:
-        print(f"📥 Endpoint consulta: {req.pregunta} | reporte: {req.reporte}")
+        print(f"📥 consulta: {req.pregunta} | {req.reporte}")
         historial = obtener_historial(req.session_id)
-
         guardar_mensaje(req.session_id, "user", req.pregunta, cmd="consulta")
         result = consultar_libre(req.pregunta, reporte=req.reporte, historial=historial)
         guardar_mensaje(req.session_id, "bot", result["respuesta"], result.get("fuentes"), cmd="consulta")
-
         return result
     except Exception as e:
-        print(f"❌ Error en consulta: {e}")
+        print(f"❌ Error consulta: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# ── Endpoint Feedback ───────────────────────────────────
-class FeedbackRequest(BaseModel):
-    session_id: str
-    pregunta: str
-    respuesta: str
-    cmd: str
-    reporte: str = None
-    voto: str  # "up" o "down"
-
+# ── Feedback ──────────────────────────────────────────────
 @app.post("/feedback")
 def endpoint_feedback(req: FeedbackRequest):
     try:
@@ -194,12 +177,60 @@ def endpoint_feedback(req: FeedbackRequest):
             "voto": req.voto,
             "timestamp": datetime.utcnow()
         })
-        print(f"{'👍' if req.voto == 'up' else '👎'} Feedback {req.voto}: {req.pregunta[:40]}")
+        emoji = "👍" if req.voto == "up" else "👎"
+        print(f"{emoji} Feedback {req.voto}: {req.pregunta[:40]}")
         return {"ok": True}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# ── Health ───────────────────────────────────────────────
+# ── Dashboard ─────────────────────────────────────────────
+@app.get("/dashboard/feedback")
+def dashboard_feedback():
+    try:
+        total_up   = db["feedback"].count_documents({"voto": "up"})
+        total_down = db["feedback"].count_documents({"voto": "down"})
+
+        negativos = list(db["feedback"].find(
+            {"voto": "down"},
+            {"_id": 0, "pregunta": 1, "respuesta": 1, "cmd": 1, "reporte": 1, "timestamp": 1}
+        ).sort("timestamp", -1).limit(50))
+
+        for n in negativos:
+            if "timestamp" in n:
+                n["timestamp"] = n["timestamp"].isoformat()
+
+        positivos = list(db["feedback"].find(
+            {"voto": "up"},
+            {"_id": 0, "pregunta": 1, "respuesta": 1, "cmd": 1, "reporte": 1, "timestamp": 1}
+        ).sort("timestamp", -1).limit(50))
+
+        for p in positivos:
+            if "timestamp" in p:
+                p["timestamp"] = p["timestamp"].isoformat()
+
+        # Breakdown por cmd — sin pipeline de agregación para evitar problemas
+        por_cmd = {}
+        todos = list(db["feedback"].find({}, {"_id": 0, "cmd": 1, "voto": 1}))
+        for item in todos:
+            cmd  = item.get("cmd") or "consulta"
+            voto = item.get("voto") or "up"
+            if cmd not in por_cmd:
+                por_cmd[cmd] = {"up": 0, "down": 0}
+            if voto in por_cmd[cmd]:
+                por_cmd[cmd][voto] += 1
+
+        return {
+            "total_up":   total_up,
+            "total_down": total_down,
+            "negativos":  negativos,
+            "positivos":  positivos,
+            "por_cmd":    por_cmd
+        }
+    except Exception as e:
+        print(f"❌ Dashboard error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ── Health ────────────────────────────────────────────────
 @app.get("/")
 def root():
     return {"status": "ok", "mensaje": "Knowledge Base CNBV activo"}
@@ -208,7 +239,6 @@ def root():
 def health():
     return {"status": "ok"}
 
-# ── Main ─────────────────────────────────────────────────
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
