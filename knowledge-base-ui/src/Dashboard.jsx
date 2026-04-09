@@ -22,11 +22,10 @@ function StatCard({ label, value, sub }) {
   )
 }
 
-function FeedbackRow({ item, showEdit }) {
+function FeedbackRow({ item, showEdit, onResuelto }) {
   const [expanded, setExpanded]   = useState(false)
   const [editing, setEditing]     = useState(false)
   const [editVal, setEditVal]     = useState(item.respuesta || "")
-  const [guardado, setGuardado]   = useState(false)
   const [guardando, setGuardando] = useState(false)
 
   const fecha = item.timestamp ? new Date(item.timestamp).toLocaleDateString("es-MX", {
@@ -43,10 +42,12 @@ function FeedbackRow({ item, showEdit }) {
         reporte: item.reporte || null,
         respuesta_corregida: editVal
       })
-      setGuardado(true)
+      alert("✅ Respuesta guardada en caché correctamente")
       setEditing(false)
+      onResuelto && onResuelto()
     } catch (e) {
       console.error("Error guardando:", e)
+      alert("❌ Error al guardar")
     } finally {
       setGuardando(false)
     }
@@ -59,7 +60,6 @@ function FeedbackRow({ item, showEdit }) {
           <span className="fb-cmd">{CMD_LABELS[item.cmd] || item.cmd}</span>
           {item.reporte && <span className="fb-rep">{item.reporte}</span>}
           <span className="fb-fecha">{fecha}</span>
-          {guardado && <span className="fb-saved">✓ guardado en caché</span>}
         </div>
         <span className="fb-toggle">{expanded ? "−" : "+"}</span>
       </div>
@@ -86,11 +86,7 @@ function FeedbackRow({ item, showEdit }) {
                 className="edit-textarea"
               />
               <div className="edit-actions">
-                <button
-                  className="btn-save"
-                  onClick={guardarEdicion}
-                  disabled={guardando}
-                >
+                <button className="btn-save" onClick={guardarEdicion} disabled={guardando}>
                   {guardando ? "Guardando..." : "Guardar en caché"}
                 </button>
                 <button className="btn-cancel" onClick={() => { setEditing(false); setEditVal(item.respuesta) }}>
@@ -99,7 +95,7 @@ function FeedbackRow({ item, showEdit }) {
               </div>
             </div>
           ) : (
-            <pre className={guardado ? "resp-editada" : ""}>{guardado ? editVal : item.respuesta}</pre>
+            <pre>{item.respuesta}</pre>
           )}
         </div>
       )}
@@ -113,11 +109,14 @@ export default function Dashboard() {
   const [tab, setTab]         = useState("down")
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
+  const cargarDatos = () => {
+    setLoading(true)
     axios.get(`${API}/dashboard/feedback`)
       .then(r => { setData(r.data); setLoading(false) })
       .catch(() => setLoading(false))
-  }, [])
+  }
+
+  useEffect(() => { cargarDatos() }, [])
 
   const total  = data ? data.total_up + data.total_down : 0
   const pct_up = total > 0 ? Math.round((data.total_up / total) * 100) : 0
@@ -139,7 +138,6 @@ export default function Dashboard() {
       ) : (
         <div className="dash-content">
 
-          {/* Stats */}
           <div className="stats-row">
             <StatCard label="Total votos" value={total} />
             <StatCard label="Positivos 👍" value={data.total_up} sub={`${pct_up}%`} />
@@ -147,7 +145,6 @@ export default function Dashboard() {
             <StatCard label="Satisfacción" value={`${pct_up}%`} />
           </div>
 
-          {/* Por comando */}
           {Object.keys(data.por_cmd).length > 0 && (
             <div className="section">
               <div className="section-title">Por comando</div>
@@ -165,7 +162,6 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* Tabs */}
           <div className="section">
             <div className="tabs">
               <button className={`dtab ${tab === "down" ? "on" : ""}`} onClick={() => setTab("down")}>
@@ -179,13 +175,22 @@ export default function Dashboard() {
             <div className="fb-list">
               {tab === "down" && (
                 data.negativos.length === 0
-                  ? <p className="empty-msg">Sin respuestas negativas 🎉</p>
-                  : data.negativos.map((item, i) => <FeedbackRow key={i} item={item} showEdit={true} />)
+                  ? <p className="empty-msg">Sin respuestas negativas pendientes 🎉</p>
+                  : data.negativos.map((item, i) => (
+                      <FeedbackRow
+                        key={i}
+                        item={item}
+                        showEdit={true}
+                        onResuelto={cargarDatos}
+                      />
+                    ))
               )}
               {tab === "up" && (
                 data.positivos.length === 0
                   ? <p className="empty-msg">Sin respuestas positivas aún</p>
-                  : data.positivos.map((item, i) => <FeedbackRow key={i} item={item} showEdit={false} />)
+                  : data.positivos.map((item, i) => (
+                      <FeedbackRow key={i} item={item} showEdit={false} />
+                    ))
               )}
             </div>
           </div>

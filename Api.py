@@ -191,7 +191,7 @@ def dashboard_feedback():
         total_down = db["feedback"].count_documents({"voto": "down"})
 
         negativos = list(db["feedback"].find(
-            {"voto": "down"},
+            {"voto": "down", "$or": [{"resuelto": {"$exists": False}}, {"resuelto": False}]},
             {"_id": 0, "pregunta": 1, "respuesta": 1, "cmd": 1, "reporte": 1, "timestamp": 1}
         ).sort("timestamp", -1).limit(50))
 
@@ -256,6 +256,11 @@ def editar_cache(req: CacheEditRequest):
                 "timestamp": datetime.utcnow()
             }},
             upsert=True
+        )
+        # Marcar feedback negativo como resuelto
+        db["feedback"].update_many(
+            {"pregunta": req.pregunta, "cmd": req.cmd, "voto": "down"},
+            {"$set": {"resuelto": True}}
         )
         print(f"✏️ Cache editado: {req.pregunta[:40]}")
         return {"ok": True}
