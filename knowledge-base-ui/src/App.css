@@ -512,3 +512,21 @@ textarea:disabled { opacity: .4; }
 }
 
 .dash-btn:hover { border-color: var(--text); color: var(--text); }
+
+/* ── Logout button ── */
+.logout-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text3);
+  width: 30px;
+  height: 30px;
+  border-radius: 5px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all .15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.logout-btn:hover { border-color: #f87171; color: #f87171; }

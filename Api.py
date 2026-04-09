@@ -1,4 +1,5 @@
 import os
+import bcrypt
 from datetime import datetime
 from bson import ObjectId
 from fastapi import FastAPI, HTTPException
@@ -29,6 +30,9 @@ db = mongo[os.getenv("DB_NAME")]
 sesiones = db["sesiones"]
 mensajes = db["mensajes"]
 
+INVITE_CODE = os.getenv("INVITE_CODE", "KnowledgeBW")
+
+# ── Helpers ───────────────────────────────────────────────
 def str_id(obj):
     obj["id"] = str(obj.pop("_id"))
     return obj
@@ -39,8 +43,33 @@ def obtener_historial(session_id, limite=6):
         {"tipo": 1, "texto": 1, "_id": 0}
     ).sort("timestamp", -1).limit(limite))[::-1]
 
+def guardar_mensaje(session_id, tipo, texto, fuentes=None, cmd=None):
+    mensajes.insert_one({
+        "session_id": session_id,
+        "tipo": tipo,
+        "texto": texto,
+        "fuentes": fuentes or [],
+        "cmd": cmd,
+        "timestamp": datetime.utcnow()
+    })
+    sesiones.update_one(
+        {"_id": ObjectId(session_id)},
+        {"$set": {"updated_at": datetime.utcnow()}}
+    )
+
+# ── Modelos ───────────────────────────────────────────────
+class LoginRequest(BaseModel):
+    usuario: str
+    password: str
+
+class RegisterRequest(BaseModel):
+    usuario: str
+    password: str
+    codigo: str
+
 class SesionCreate(BaseModel):
     nombre: str
+    usuario: str
 
 class SesionUpdate(BaseModel):
     nombre: str
@@ -58,16 +87,59 @@ class FeedbackRequest(BaseModel):
     reporte: str = None
     voto: str
 
-# ── Sesiones ─────────────────────────────────────────────
+class CacheEditRequest(BaseModel):
+    pregunta: str
+    cmd: str
+    reporte: str = None
+    respuesta_corregida: str
+
+# ── Auth ──────────────────────────────────────────────────
+@app.post("/login")
+def login(req: LoginRequest):
+    user = db["usuarios"].find_one({"usuario": req.usuario, "activo": True})
+    if not user:
+        raise HTTPException(status_code=401, detail="Credenciales incorrectas")
+    if not bcrypt.checkpw(req.password.encode(), user["password"]):
+        raise HTTPException(status_code=401, detail="Credenciales incorrectas")
+    print(f"🔑 Login: {req.usuario} ({user['rol']})")
+    return {"usuario": req.usuario, "rol": user["rol"]}
+
+@app.post("/register")
+def register(req: RegisterRequest):
+    if req.codigo != INVITE_CODE:
+        raise HTTPException(status_code=403, detail="Código de invitación incorrecto")
+    if db["usuarios"].find_one({"usuario": req.usuario}):
+        raise HTTPException(status_code=400, detail="El usuario ya existe")
+    if len(req.password) < 6:
+        raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 6 caracteres")
+
+    hashed = bcrypt.hashpw(req.password.encode(), bcrypt.gensalt())
+    db["usuarios"].insert_one({
+        "usuario": req.usuario,
+        "password": hashed,
+        "rol": "usuario",
+        "activo": True,
+        "created_at": datetime.utcnow()
+    })
+    print(f"✅ Nuevo usuario registrado: {req.usuario}")
+    return {"usuario": req.usuario, "rol": "usuario"}
+
+# ── Sesiones ──────────────────────────────────────────────
 @app.get("/sesiones")
-def listar_sesiones():
-    result = list(sesiones.find().sort("updated_at", -1))
+def listar_sesiones(usuario: str = ""):
+    filtro = {"usuario": usuario} if usuario else {}
+    result = list(sesiones.find(filtro).sort("updated_at", -1))
     return [str_id(s) for s in result]
 
 @app.post("/sesiones")
 def crear_sesion(body: SesionCreate):
     now = datetime.utcnow()
-    doc = {"nombre": body.nombre, "created_at": now, "updated_at": now}
+    doc = {
+        "nombre": body.nombre,
+        "usuario": body.usuario,
+        "created_at": now,
+        "updated_at": now
+    }
     result = sesiones.insert_one(doc)
     doc["id"] = str(result.inserted_id)
     doc.pop("_id", None)
@@ -94,20 +166,6 @@ def obtener_mensajes(session_id: str):
         {"_id": 0}
     ).sort("timestamp", 1))
     return result
-
-def guardar_mensaje(session_id, tipo, texto, fuentes=None, cmd=None):
-    mensajes.insert_one({
-        "session_id": session_id,
-        "tipo": tipo,
-        "texto": texto,
-        "fuentes": fuentes or [],
-        "cmd": cmd,
-        "timestamp": datetime.utcnow()
-    })
-    sesiones.update_one(
-        {"_id": ObjectId(session_id)},
-        {"$set": {"updated_at": datetime.utcnow()}}
-    )
 
 # ── Consultas ─────────────────────────────────────────────
 @app.post("/campo")
@@ -208,7 +266,6 @@ def dashboard_feedback():
             if "timestamp" in p:
                 p["timestamp"] = p["timestamp"].isoformat()
 
-        # Breakdown por cmd — sin pipeline de agregación para evitar problemas
         por_cmd = {}
         todos = list(db["feedback"].find({}, {"_id": 0, "cmd": 1, "voto": 1}))
         for item in todos:
@@ -230,14 +287,7 @@ def dashboard_feedback():
         print(f"❌ Dashboard error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-
 # ── Editar caché ──────────────────────────────────────────
-class CacheEditRequest(BaseModel):
-    pregunta: str
-    cmd: str
-    reporte: str = None
-    respuesta_corregida: str
-
 @app.put("/cache/editar")
 def editar_cache(req: CacheEditRequest):
     try:
@@ -257,7 +307,6 @@ def editar_cache(req: CacheEditRequest):
             }},
             upsert=True
         )
-        # Marcar feedback negativo como resuelto
         db["feedback"].update_many(
             {"pregunta": req.pregunta, "cmd": req.cmd, "voto": "down"},
             {"$set": {"resuelto": True}}

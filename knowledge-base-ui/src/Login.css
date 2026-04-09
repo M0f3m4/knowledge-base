@@ -1,0 +1,129 @@
+@import url('https://fonts.googleapis.com/css2?family=Geist+Mono:wght@300;400;500&family=Geist:wght@300;400;500&display=swap');
+
+.login-shell {
+  min-height: 100vh;
+  background: #080808;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Geist', sans-serif;
+}
+
+.login-box {
+  width: 340px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.login-logo img {
+  height: 32px;
+  width: auto;
+  display: block;
+  margin: 0 auto;
+}
+
+.login-title {
+  text-align: center;
+}
+
+.login-title h1 {
+  font-size: 18px;
+  font-weight: 500;
+  color: #e8e8e8;
+  margin-bottom: 4px;
+}
+
+.login-title p {
+  font-size: 11px;
+  color: #444;
+  font-family: 'Geist Mono', monospace;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: #0f0f0f;
+  border: 1px solid #1e1e1e;
+  border-radius: 10px;
+  padding: 24px;
+}
+
+.login-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.login-field label {
+  font-size: 11px;
+  color: #444;
+  font-family: 'Geist Mono', monospace;
+}
+
+.login-field input {
+  background: #161616;
+  border: 1px solid #222;
+  color: #e8e8e8;
+  padding: 9px 12px;
+  border-radius: 6px;
+  font-family: 'Geist', sans-serif;
+  font-size: 13px;
+  outline: none;
+  transition: border-color .15s;
+}
+
+.login-field input:focus { border-color: #444; }
+.login-field input::placeholder { color: #333; }
+.login-field input:disabled { opacity: .4; }
+
+.login-error {
+  font-size: 11px;
+  color: #f87171;
+  font-family: 'Geist Mono', monospace;
+  text-align: center;
+}
+
+.login-btn {
+  background: #e8e8e8;
+  border: none;
+  color: #080808;
+  padding: 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: 'Geist', sans-serif;
+  font-weight: 500;
+  cursor: pointer;
+  margin-top: 4px;
+  transition: opacity .15s;
+}
+
+.login-btn:hover:not(:disabled) { opacity: .85; }
+.login-btn:disabled { opacity: .3; cursor: not-allowed; }
+
+/* ── Tabs ── */
+.login-tabs {
+  display: flex;
+  gap: 4px;
+  background: #0f0f0f;
+  border: 1px solid #1e1e1e;
+  border-radius: 8px;
+  padding: 4px;
+}
+
+.ltab {
+  flex: 1;
+  background: none;
+  border: none;
+  color: #444;
+  padding: 7px;
+  border-radius: 5px;
+  font-size: 12px;
+  font-family: 'Geist', sans-serif;
+  cursor: pointer;
+  transition: all .15s;
+}
+
+.ltab:hover { color: #888; }
+.ltab.on { background: #161616; color: #e8e8e8; }

@@ -50,20 +50,10 @@ function Burbuja({ m, onFeedback }) {
         <Fuentes fuentes={m.fuentes} />
         {m.tipo === "bot" && m.texto !== "¿En qué puedo ayudarte?" && m.texto !== "Sesión vacía. ¿En qué puedo ayudarte?" && (
           <div className="feedback">
-            <button
-              className={`fvoto ${voto === "up" ? "active-up" : ""}`}
-              onClick={() => votar("up")}
-              disabled={!!voto}
-              title="Buena respuesta"
-            >
+            <button className={`fvoto ${voto === "up" ? "active-up" : ""}`} onClick={() => votar("up")} disabled={!!voto} title="Buena respuesta">
               {voto === "up" ? "👍" : "↑"}
             </button>
-            <button
-              className={`fvoto ${voto === "down" ? "active-down" : ""}`}
-              onClick={() => votar("down")}
-              disabled={!!voto}
-              title="Mala respuesta"
-            >
+            <button className={`fvoto ${voto === "down" ? "active-down" : ""}`} onClick={() => votar("down")} disabled={!!voto} title="Mala respuesta">
               {voto === "down" ? "👎" : "↓"}
             </button>
           </div>
@@ -84,7 +74,8 @@ function Dots() {
   )
 }
 
-export default function App() {
+export default function App({ auth, onLogout }) {
+  const navigate = useNavigate()
   const [sesiones, setSesiones]   = useState([])
   const [sid, setSid]             = useState(null)
   const [msgs, setMsgs]           = useState([])
@@ -95,7 +86,6 @@ export default function App() {
   const [editId, setEditId]       = useState(null)
   const [editVal, setEditVal]     = useState("")
   const [sideOpen, setSideOpen]   = useState(true)
-  const navigate = useNavigate()
   const bottom = useRef(null)
   const lastUserMsg = useRef(null)
 
@@ -103,13 +93,13 @@ export default function App() {
   useEffect(() => { bottom.current?.scrollIntoView({ behavior: "smooth" }) }, [msgs, cargando])
 
   const cargarSesiones = async () => {
-    const r = await axios.get(`${API}/sesiones`)
+    const r = await axios.get(`${API}/sesiones?usuario=${auth.usuario}`)
     setSesiones(r.data)
   }
 
   const nuevaSesion = async () => {
     const nombre = `Sesión ${new Date().toLocaleString("es-MX", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}`
-    const r = await axios.post(`${API}/sesiones`, { nombre })
+    const r = await axios.post(`${API}/sesiones`, { nombre, usuario: auth.usuario })
     setSesiones(p => [r.data, ...p])
     setSid(r.data.id)
     setMsgs([{ tipo: "bot", texto: "¿En qué puedo ayudarte?", fuentes: null }])
@@ -170,7 +160,7 @@ export default function App() {
 
   return (
     <div className="shell">
-      {/* Logo */}
+      {/* Logo bar */}
       <div className="logo-bar">
         <img src="/logo.png" alt="Bajaware" className="logo-img" />
       </div>
@@ -220,21 +210,22 @@ export default function App() {
 
       {/* Main */}
       <div className="main">
-        {/* Top bar */}
         <header className="topbar">
           <div className="topbar-left">
             <span className="logo-mark">◈</span>
             <span className="session-name">{nomSesion || "Knowledge Base CNBV"}</span>
           </div>
-          <div style={{display:"flex",gap:"8px",alignItems:"center"}}>
-          <button className="dash-btn" onClick={() => navigate("/dashboard")}>Dashboard</button>
-          <select className="rep-sel" value={reporte} onChange={e => setReporte(e.target.value)}>
-            {REPORTES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
-          </select>
+          <div style={{display:"flex", gap:"8px", alignItems:"center"}}>
+            {auth.rol === "admin" && (
+              <button className="dash-btn" onClick={() => navigate("/dashboard")}>Dashboard</button>
+            )}
+            <select className="rep-sel" value={reporte} onChange={e => setReporte(e.target.value)}>
+              {REPORTES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+            </select>
+            <button className="logout-btn" onClick={onLogout} title="Cerrar sesión">⎋</button>
           </div>
         </header>
 
-        {/* Chat */}
         <div className="chat">
           {!sid ? (
             <div className="empty-state">
@@ -273,16 +264,11 @@ export default function App() {
           )}
         </div>
 
-        {/* Input */}
         {sid && (
           <div className="inputbar">
             <div className="cmd-row">
               {CMDS.map(c => (
-                <button
-                  key={c.id}
-                  className={`ctab ${cmd === c.id ? "on" : ""}`}
-                  onClick={() => setCmd(c.id)}
-                >
+                <button key={c.id} className={`ctab ${cmd === c.id ? "on" : ""}`} onClick={() => setCmd(c.id)}>
                   {c.label}
                 </button>
               ))}
@@ -291,14 +277,12 @@ export default function App() {
               <textarea
                 value={input}
                 onChange={e => setInput(e.target.value)}
-                onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviar() }}}
+                onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviar() } }}
                 placeholder={CMDS.find(c => c.id === cmd)?.ph}
                 rows={2}
                 disabled={cargando}
               />
-              <button className="send-btn" onClick={enviar} disabled={cargando || !input.trim()}>
-                ↑
-              </button>
+              <button className="send-btn" onClick={enviar} disabled={cargando || !input.trim()}>↑</button>
             </div>
           </div>
         )}

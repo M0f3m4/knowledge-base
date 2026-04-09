@@ -75,7 +75,7 @@ source venv/bin/activate
 
 ### 3. Instalar dependencias Python
 ```bash
-pip install fastapi uvicorn pymongo python-dotenv langchain-ollama langchain-community langchain-text-splitters pdfplumber requests
+pip install fastapi uvicorn pymongo python-dotenv langchain-ollama langchain-community langchain-text-splitters pdfplumber requests bcrypt
 ```
 
 ### 4. Instalar dependencias del frontend
@@ -94,9 +94,18 @@ MONGO_URI=mongodb+srv://usuario:password@cluster.mongodb.net/
 DB_NAME=knowledge_base
 OLLAMA_URL=http://localhost:11434
 VOYAGE_API_KEY=al-xxxxxxxxxxxxxxxxxxxx
+INVITE_CODE=KnowledgeBW
 ```
 
 > ✅ El cluster de MongoDB Atlas, los documentos y el índice vectorial ya están configurados.
+
+### 6. Crear usuario administrador
+
+```bash
+python crear_usuarios.py
+```
+
+Este script crea el usuario administrador en MongoDB. Solo necesitas correrlo una vez.
 
 ---
 
@@ -145,8 +154,11 @@ lsof -ti :8000 | xargs kill -9
 
 ## Uso
 
+### Inicio de sesión
+Al abrir la app aparece una pantalla de login. Para crear una cuenta nueva necesitas el **código de invitación** proporcionado por el administrador.
+
 ### Sesiones
-Crea sesiones de conversación desde el panel lateral. Cada sesión mantiene memoria de los últimos 6 mensajes para respuestas contextuales.
+Crea sesiones de conversación desde el panel lateral. Cada usuario tiene sus propias sesiones privadas. Cada sesión mantiene memoria de los últimos 6 mensajes para respuestas contextuales.
 
 ### Comandos
 
@@ -162,8 +174,8 @@ Filtra por reporte usando el selector en la barra superior.
 ### Feedback
 Cada respuesta tiene botones ↑ ↓ para calificarla. El feedback se guarda en MongoDB para análisis de calidad.
 
-### Dashboard
-Accede desde el botón **Dashboard** en la barra superior para ver métricas de feedback, respuestas positivas y negativas agrupadas por comando.
+### Dashboard (solo admin)
+Accede desde el botón **Dashboard** en la barra superior para ver métricas de feedback, respuestas positivas y negativas. Las respuestas negativas se pueden editar y guardar en caché corregidas.
 
 ---
 
@@ -196,10 +208,13 @@ knowledge-base/
 │       ├── App.css
 │       ├── Dashboard.jsx
 │       ├── Dashboard.css
+│       ├── Login.jsx
+│       ├── Login.css
 │       └── main.jsx
 ├── Api.py                   # Backend FastAPI
 ├── Consultar.py             # Motor RAG (búsqueda + reranking + respuesta)
 ├── cargar_docs.py           # Carga PDFs a MongoDB Atlas con Voyage
+├── crear_usuarios.py        # Script para crear usuarios iniciales
 ├── columnas_0430.py         # Mapa de las 53 columnas del reporte 0430
 ├── analisis_0430.json       # Clasificación CALCULADO/CATALOGO/MANUAL
 ├── .env                     # Variables de entorno (no incluido en repo)
@@ -213,7 +228,8 @@ knowledge-base/
 | Colección | Descripción |
 |---|---|
 | `documentos` | Fragmentos de PDFs con embeddings vectoriales |
-| `sesiones` | Sesiones de conversación |
+| `usuarios` | Usuarios con contraseñas hasheadas |
+| `sesiones` | Sesiones de conversación por usuario |
 | `mensajes` | Historial de mensajes por sesión |
 | `cache` | Caché de respuestas para consultas repetidas |
 | `feedback` | Calificaciones 👍👎 de las respuestas |
