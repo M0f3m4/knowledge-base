@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import './index.css'
 import App from './App.jsx'
 import Dashboard from './Dashboard.jsx'
+import Conocimiento from './Conocimiento.jsx'
 import Login from './Login.jsx'
 
 function Root() {
@@ -36,6 +37,7 @@ function Root() {
               : <Navigate to="/" />
           }
         />
+        <Route path="/conocimiento" element={<Conocimiento />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </BrowserRouter>

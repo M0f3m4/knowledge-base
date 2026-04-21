@@ -530,3 +530,217 @@ textarea:disabled { opacity: .4; }
 }
 
 .logout-btn:hover { border-color: #f87171; color: #f87171; }
+
+/* ── Nota feedback ── */
+.feedback-area {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.nota-area {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  animation: fadeUp .15s ease;
+}
+
+.nota-input {
+  background: var(--s2);
+  border: 1px solid var(--border2);
+  color: var(--text);
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-family: 'Geist', sans-serif;
+  font-size: 12px;
+  resize: none;
+  outline: none;
+  line-height: 1.5;
+  transition: border-color .15s;
+}
+
+.nota-input:focus { border-color: var(--text3); }
+.nota-input::placeholder { color: var(--text3); }
+
+.nota-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.nota-btn-send {
+  background: #f87171;
+  border: none;
+  color: #fff;
+  padding: 5px 12px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-family: 'Geist Mono', monospace;
+  cursor: pointer;
+  transition: opacity .15s;
+}
+
+.nota-btn-send:hover { opacity: .85; }
+
+.nota-btn-skip {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text3);
+  padding: 5px 12px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-family: 'Geist Mono', monospace;
+  cursor: pointer;
+  transition: all .15s;
+}
+
+.nota-btn-skip:hover { border-color: var(--text2); color: var(--text2); }
+
+/* ── Tooltip fuentes ── */
+.ftag {
+  position: relative;
+  cursor: default;
+}
+
+.ftag-tooltip {
+  position: fixed;
+  z-index: 999;
+  background: #161616;
+  border: 1px solid #2a2a2a;
+  border-radius: 6px;
+  padding: 10px 12px;
+  max-width: 320px;
+  max-height: 180px;
+  overflow-y: auto;
+  font-size: 10px;
+  font-family: 'Geist Mono', monospace;
+  color: #888;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  box-shadow: 0 4px 20px rgba(0,0,0,.6);
+  pointer-events: none;
+  scrollbar-width: thin;
+  scrollbar-color: #222 transparent;
+}
+
+/* ── Cancel button ── */
+.cancel-btn {
+  background: #f87171;
+  border: none;
+  color: #fff;
+  width: 38px;
+  height: 38px;
+  border-radius: 7px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: opacity .15s;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cancel-btn:hover { opacity: .85; }
+
+/* ── Welcome screen ── */
+.welcome {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  flex: 1;
+  padding: 40px 20px;
+}
+
+.welcome-logo {
+  font-size: 36px;
+  color: var(--text3);
+}
+
+.welcome-title {
+  font-size: 20px;
+  font-weight: 500;
+  color: var(--text);
+  margin: 0;
+}
+
+.welcome-sub {
+  font-size: 11px;
+  color: var(--text2);
+  font-family: 'Geist Mono', monospace;
+  margin: 0;
+}
+
+.welcome-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  width: 100%;
+  max-width: 480px;
+  margin: 8px 0;
+}
+
+.wstat {
+  background: var(--s1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: center;
+}
+
+.wstat-val {
+  font-size: 22px;
+  font-weight: 500;
+  color: var(--text);
+  font-family: 'Geist Mono', monospace;
+}
+
+.wstat-label {
+  font-size: 10px;
+  color: var(--text2);
+  font-family: 'Geist Mono', monospace;
+}
+
+/* ── Progreso ── */
+.progreso {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 2px 0;
+}
+
+.progreso-texto {
+  font-size: 11px;
+  font-family: 'Geist Mono', monospace;
+  color: var(--text2);
+  animation: fadeIn .3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.progreso-barra {
+  display: flex;
+  gap: 4px;
+}
+
+.progreso-paso {
+  height: 2px;
+  flex: 1;
+  border-radius: 2px;
+  background: var(--border2);
+  transition: background .4s ease;
+}
+
+.progreso-paso.activo {
+  background: var(--accent);
+}

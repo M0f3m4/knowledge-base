@@ -19,15 +19,59 @@ const REPORTES = [
   { value: "0432", label: "0432 · Bajas" },
 ]
 
+function FuenteTag({ f }) {
+  const [tooltip, setTooltip] = useState(null)
+  const [pos, setPos] = useState({ x: 0, y: 0 })
+  const [loading, setLoading] = useState(false)
+
+  const mostrar = async (e) => {
+    setPos({ x: e.clientX, y: e.clientY })
+    if (tooltip !== null) return
+    setLoading(true)
+    try {
+      const r = await fetch(`http://localhost:8000/fragmento?fuente=${encodeURIComponent(f.fuente)}&pagina=${f.pagina}`)
+      const data = await r.json()
+      setTooltip(data.texto || "Sin texto")
+    } catch {
+      setTooltip("Error cargando fragmento")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const ocultar = () => setTooltip(null)
+
+  return (
+    <span
+      className="ftag"
+      onMouseEnter={mostrar}
+      onMouseLeave={ocultar}
+      style={{ position: "relative" }}
+    >
+      {f.fuente.split("_")[0].slice(0, 12)}… p{f.pagina}
+      {(loading || tooltip) && (
+        <div
+          className="ftag-tooltip"
+          style={{
+            position: "fixed",
+            left: Math.min(pos.x + 12, window.innerWidth - 340),
+            top: Math.min(pos.y + 12, window.innerHeight - 200),
+          }}
+        >
+          {loading ? "Cargando…" : tooltip}
+        </div>
+      )}
+    </span>
+  )
+}
+
 function Fuentes({ fuentes }) {
   if (!fuentes?.length) return null
   const u = [...new Map(fuentes.map(f => [`${f.fuente}_${f.pagina}`, f])).values()]
   return (
     <div className="fuentes">
       {u.map((f, i) => (
-        <span key={i} className="ftag">
-          {f.fuente.split("_")[0].slice(0, 12)}… p{f.pagina}
-        </span>
+        <FuenteTag key={i} f={f} />
       ))}
     </div>
   )
@@ -35,11 +79,23 @@ function Fuentes({ fuentes }) {
 
 function Burbuja({ m, onFeedback }) {
   const [voto, setVoto] = useState(null)
+  const [mostrarNota, setMostrarNota] = useState(false)
+  const [nota, setNota] = useState("")
 
-  const votar = async (v) => {
+  const votar = (v) => {
     if (voto) return
-    setVoto(v)
-    onFeedback && onFeedback(m, v)
+    if (v === "down") {
+      setMostrarNota(true)
+    } else {
+      setVoto("up")
+      onFeedback && onFeedback(m, "up", "")
+    }
+  }
+
+  const enviarDown = () => {
+    setVoto("down")
+    setMostrarNota(false)
+    onFeedback && onFeedback(m, "down", nota)
   }
 
   return (
@@ -49,13 +105,31 @@ function Burbuja({ m, onFeedback }) {
         <pre>{m.texto}</pre>
         <Fuentes fuentes={m.fuentes} />
         {m.tipo === "bot" && m.texto !== "¿En qué puedo ayudarte?" && m.texto !== "Sesión vacía. ¿En qué puedo ayudarte?" && (
-          <div className="feedback">
-            <button className={`fvoto ${voto === "up" ? "active-up" : ""}`} onClick={() => votar("up")} disabled={!!voto} title="Buena respuesta">
-              {voto === "up" ? "👍" : "↑"}
-            </button>
-            <button className={`fvoto ${voto === "down" ? "active-down" : ""}`} onClick={() => votar("down")} disabled={!!voto} title="Mala respuesta">
-              {voto === "down" ? "👎" : "↓"}
-            </button>
+          <div className="feedback-area">
+            <div className="feedback">
+              <button className={`fvoto ${voto === "up" ? "active-up" : ""}`} onClick={() => votar("up")} disabled={!!voto} title="Buena respuesta">
+                {voto === "up" ? "👍" : "↑"}
+              </button>
+              <button className={`fvoto ${voto === "down" ? "active-down" : ""}`} onClick={() => votar("down")} disabled={!!voto} title="Mala respuesta">
+                {voto === "down" ? "👎" : "↓"}
+              </button>
+            </div>
+            {mostrarNota && (
+              <div className="nota-area">
+                <textarea
+                  className="nota-input"
+                  placeholder="¿Por qué no es la respuesta esperada? (opcional)"
+                  value={nota}
+                  onChange={e => setNota(e.target.value)}
+                  rows={2}
+                  autoFocus
+                />
+                <div className="nota-actions">
+                  <button className="nota-btn-send" onClick={enviarDown}>Enviar 👎</button>
+                  <button className="nota-btn-skip" onClick={() => { setMostrarNota(false); enviarDown() }}>Sin nota</button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -63,12 +137,37 @@ function Burbuja({ m, onFeedback }) {
   )
 }
 
-function Dots() {
+const PASOS = {
+  consulta: ["Reformulando pregunta…", "Buscando fragmentos…", "Rerankeando resultados…", "Generando respuesta…"],
+  campo:    ["Identificando campo…", "Buscando fragmentos…", "Rerankeando resultados…", "Generando respuesta…"],
+  calculo:  ["Identificando campo…", "Buscando fórmulas…", "Rerankeando resultados…", "Calculando respuesta…"],
+  reporte:  ["Cargando campos del reporte…"],
+}
+
+function Dots({ cmd }) {
+  const pasos = PASOS[cmd] || PASOS.consulta
+  const [paso, setPaso] = useState(0)
+
+  useEffect(() => {
+    if (pasos.length <= 1) return
+    const intervalo = setInterval(() => {
+      setPaso(p => p < pasos.length - 1 ? p + 1 : p)
+    }, 2500)
+    return () => clearInterval(intervalo)
+  }, [])
+
   return (
     <div className="burbuja bot">
       <div className="bot-label">CNBV</div>
       <div className="burbuja-inner">
-        <div className="typing"><span/><span/><span/></div>
+        <div className="progreso">
+          <div className="progreso-texto">{pasos[paso]}</div>
+          <div className="progreso-barra">
+            {pasos.map((_, i) => (
+              <div key={i} className={`progreso-paso ${i <= paso ? "activo" : ""}`} />
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   )
@@ -88,9 +187,18 @@ export default function App({ auth, onLogout }) {
   const [sideOpen, setSideOpen]   = useState(true)
   const bottom = useRef(null)
   const lastUserMsg = useRef(null)
+  const abortRef = useRef(null)
+  const [stats, setStats] = useState(null)
 
-  useEffect(() => { cargarSesiones() }, [])
+  useEffect(() => { cargarSesiones(); cargarStats() }, [])
   useEffect(() => { bottom.current?.scrollIntoView({ behavior: "smooth" }) }, [msgs, cargando])
+
+  const cargarStats = async () => {
+    try {
+      const r = await axios.get(`${API}/stats`)
+      setStats(r.data)
+    } catch {}
+  }
 
   const cargarSesiones = async () => {
     const r = await axios.get(`${API}/sesiones?usuario=${auth.usuario}`)
@@ -126,6 +234,15 @@ export default function App({ auth, onLogout }) {
     setEditId(null); setEditVal("")
   }
 
+  const cancelar = () => {
+    if (abortRef.current) {
+      abortRef.current.abort()
+      abortRef.current = null
+    }
+    setCargando(false)
+    setMsgs(p => [...p, { tipo: "bot", texto: "Consulta cancelada.", fuentes: null }])
+  }
+
   const enviar = async () => {
     if (!input.trim() || cargando || !sid) return
     const q = input.trim()
@@ -133,13 +250,17 @@ export default function App({ auth, onLogout }) {
     setMsgs(p => [...p, { tipo: "user", texto: q, cmd, fuentes: null }])
     setCargando(true)
 
+    const controller = new AbortController()
+    abortRef.current = controller
+
     try {
       const body = { pregunta: q, reporte: reporte || null, session_id: sid }
+      const config = { signal: controller.signal }
       let r
-      if (cmd === "consulta") r = await axios.post(`${API}/consulta`, body)
-      else if (cmd === "campo")   r = await axios.post(`${API}/campo`, body)
-      else if (cmd === "calculo") r = await axios.post(`${API}/calculo`, body)
-      else if (cmd === "reporte") r = await axios.post(`${API}/reporte`, { ...body, pregunta: reporte || q })
+      if (cmd === "consulta") r = await axios.post(`${API}/consulta`, body, config)
+      else if (cmd === "campo")   r = await axios.post(`${API}/campo`, body, config)
+      else if (cmd === "calculo") r = await axios.post(`${API}/calculo`, body, config)
+      else if (cmd === "reporte") r = await axios.post(`${API}/reporte`, { ...body, pregunta: reporte || q }, config)
 
       setMsgs(p => [...p, { tipo: "bot", texto: r.data.respuesta, fuentes: r.data.fuentes }])
 
@@ -150,8 +271,10 @@ export default function App({ auth, onLogout }) {
         setSesiones(p => p.map(x => x.id === sid ? { ...x, nombre: n } : x))
       }
     } catch (e) {
+      if (axios.isCancel(e) || e.name === "CanceledError" || e.name === "AbortError") return
       setMsgs(p => [...p, { tipo: "bot", texto: `Error: ${e.response?.data?.detail || e.message}`, fuentes: null }])
     } finally {
+      abortRef.current = null
       setCargando(false)
     }
   }
@@ -219,6 +342,7 @@ export default function App({ auth, onLogout }) {
             {auth.rol === "admin" && (
               <button className="dash-btn" onClick={() => navigate("/dashboard")}>Dashboard</button>
             )}
+            <button className="dash-btn" onClick={() => navigate("/conocimiento")}>Base de Conocimiento</button>
             <select className="rep-sel" value={reporte} onChange={e => setReporte(e.target.value)}>
               {REPORTES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
             </select>
@@ -228,10 +352,41 @@ export default function App({ auth, onLogout }) {
 
         <div className="chat">
           {!sid ? (
-            <div className="empty-state">
-              <div className="empty-icon">◈</div>
-              <p>Crea o selecciona una sesión para comenzar</p>
-              <button className="btn-start" onClick={nuevaSesion}>Nueva sesión</button>
+            <div className="welcome">
+              <div className="welcome-logo">◈</div>
+              <h2 className="welcome-title">Knowledge Base CNBV</h2>
+              <p className="welcome-sub">Regulación bancaria · Voyage AI · Mistral</p>
+
+              {stats && (
+                <div className="welcome-stats">
+                  <div className="wstat">
+                    <div className="wstat-val">{stats.fragmentos.toLocaleString()}</div>
+                    <div className="wstat-label">fragmentos indexados</div>
+                  </div>
+                  <div className="wstat">
+                    <div className="wstat-val">{stats.documentos}</div>
+                    <div className="wstat-label">documentos</div>
+                  </div>
+                  <div className="wstat">
+                    <div className="wstat-val">{stats.preguntas.toLocaleString()}</div>
+                    <div className="wstat-label">preguntas respondidas</div>
+                  </div>
+                  <div className="wstat">
+                    <div className="wstat-val">{stats.cache}</div>
+                    <div className="wstat-label">respuestas en caché</div>
+                  </div>
+                  <div className="wstat">
+                    <div className="wstat-val">{stats.sesiones}</div>
+                    <div className="wstat-label">sesiones</div>
+                  </div>
+                  <div className="wstat">
+                    <div className="wstat-val">{stats.feedback}</div>
+                    <div className="wstat-label">votos de feedback</div>
+                  </div>
+                </div>
+              )}
+
+              <button className="btn-start" onClick={nuevaSesion}>+ Nueva sesión</button>
             </div>
           ) : (
             <>
@@ -241,7 +396,7 @@ export default function App({ auth, onLogout }) {
                   <Burbuja
                     key={i}
                     m={m}
-                    onFeedback={async (msg, voto) => {
+                    onFeedback={async (msg, voto, nota) => {
                       try {
                         await axios.post(`${API}/feedback`, {
                           session_id: sid,
@@ -249,7 +404,8 @@ export default function App({ auth, onLogout }) {
                           respuesta: msg.texto,
                           cmd: lastUserMsg.current?.cmd || "consulta",
                           reporte: reporte || null,
-                          voto
+                          voto,
+                          nota: nota || ""
                         })
                       } catch (e) {
                         console.error("Feedback error:", e)
@@ -258,7 +414,7 @@ export default function App({ auth, onLogout }) {
                   />
                 )
               })}
-              {cargando && <Dots />}
+              {cargando && <Dots cmd={cmd} />}
               <div ref={bottom} />
             </>
           )}
@@ -282,7 +438,10 @@ export default function App({ auth, onLogout }) {
                 rows={2}
                 disabled={cargando}
               />
-              <button className="send-btn" onClick={enviar} disabled={cargando || !input.trim()}>↑</button>
+              {cargando
+                ? <button className="cancel-btn" onClick={cancelar} title="Cancelar">✕</button>
+                : <button className="send-btn" onClick={enviar} disabled={!input.trim()}>↑</button>
+              }
             </div>
           </div>
         )}

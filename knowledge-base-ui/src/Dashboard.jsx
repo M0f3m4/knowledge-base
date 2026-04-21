@@ -66,6 +66,12 @@ function FeedbackRow({ item, showEdit, onResuelto }) {
 
       <div className="fb-pregunta">{item.pregunta}</div>
 
+      {item.nota && (
+        <div className="fb-nota">
+          <span className="fb-nota-label">📝 Nota:</span> {item.nota}
+        </div>
+      )}
+
       {expanded && (
         <div className="fb-respuesta">
           <div className="fb-resp-header">

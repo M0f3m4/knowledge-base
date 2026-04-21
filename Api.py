@@ -86,6 +86,7 @@ class FeedbackRequest(BaseModel):
     cmd: str
     reporte: str = None
     voto: str
+    nota: str = ""
 
 class CacheEditRequest(BaseModel):
     pregunta: str
@@ -233,6 +234,7 @@ def endpoint_feedback(req: FeedbackRequest):
             "cmd": req.cmd,
             "reporte": req.reporte,
             "voto": req.voto,
+            "nota": req.nota,
             "timestamp": datetime.utcnow()
         })
         emoji = "👍" if req.voto == "up" else "👎"
@@ -250,7 +252,7 @@ def dashboard_feedback():
 
         negativos = list(db["feedback"].find(
             {"voto": "down", "$or": [{"resuelto": {"$exists": False}}, {"resuelto": False}]},
-            {"_id": 0, "pregunta": 1, "respuesta": 1, "cmd": 1, "reporte": 1, "timestamp": 1}
+            {"_id": 0, "pregunta": 1, "respuesta": 1, "cmd": 1, "reporte": 1, "timestamp": 1, "nota": 1}
         ).sort("timestamp", -1).limit(50))
 
         for n in negativos:
@@ -316,6 +318,77 @@ def editar_cache(req: CacheEditRequest):
     except Exception as e:
         print(f"❌ Error editar cache: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+
+# ── Fragmento por fuente y página ────────────────────────
+@app.get("/fragmento")
+def obtener_fragmento(fuente: str, pagina: int):
+    try:
+        doc = db["documentos"].find_one(
+            {"fuente": fuente, "pagina": pagina - 1},
+            {"texto": 1, "_id": 0}
+        )
+        if not doc:
+            raise HTTPException(status_code=404, detail="Fragmento no encontrado")
+        return {"texto": doc["texto"]}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── Estadísticas del sistema ──────────────────────────────
+@app.get("/stats")
+def obtener_stats():
+    try:
+        total_docs     = db["documentos"].count_documents({})
+        total_fuentes  = len(db["documentos"].distinct("fuente"))
+        total_sesiones = db["sesiones"].count_documents({})
+        total_mensajes = db["mensajes"].count_documents({"tipo": "user"})
+        total_cache    = db["cache"].count_documents({})
+        total_feedback = db["feedback"].count_documents({})
+        return {
+            "fragmentos":  total_docs,
+            "documentos":  total_fuentes,
+            "sesiones":    total_sesiones,
+            "preguntas":   total_mensajes,
+            "cache":       total_cache,
+            "feedback":    total_feedback,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ── Base de Conocimiento ──────────────────────────────────
+@app.get("/conocimiento/documentos")
+def listar_documentos():
+    try:
+        pipeline = [
+            {"$group": {
+                "_id": "$fuente",
+                "paginas": {"$max": "$pagina"},
+                "fragmentos": {"$sum": 1}
+            }},
+            {"$sort": {"_id": 1}}
+        ]
+        docs = list(db["documentos"].aggregate(pipeline))
+        return [{
+            "nombre": d["_id"],
+            "fragmentos": d["fragmentos"],
+            "paginas": d["paginas"] + 1
+        } for d in docs]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/conocimiento/pdf/{nombre}")
+def servir_pdf(nombre: str):
+    import urllib.parse
+    from fastapi.responses import FileResponse
+    nombre_decoded = urllib.parse.unquote(nombre)
+    ruta = os.path.join("docs", nombre_decoded)
+    if not os.path.exists(ruta):
+        raise HTTPException(status_code=404, detail="PDF no encontrado")
+    return FileResponse(ruta, media_type="application/pdf", filename=nombre_decoded)
 
 # ── Health ────────────────────────────────────────────────
 @app.get("/")
