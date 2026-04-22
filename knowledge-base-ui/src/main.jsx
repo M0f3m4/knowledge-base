@@ -5,6 +5,7 @@ import './index.css'
 import App from './App.jsx'
 import Dashboard from './Dashboard.jsx'
 import Conocimiento from './Conocimiento.jsx'
+import Datos from './Datos.jsx'
 import Login from './Login.jsx'
 
 function Root() {
@@ -38,6 +39,7 @@ function Root() {
           }
         />
         <Route path="/conocimiento" element={<Conocimiento />} />
+        <Route path="/datos" element={<Datos />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </BrowserRouter>

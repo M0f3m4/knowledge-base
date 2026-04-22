@@ -343,6 +343,7 @@ export default function App({ auth, onLogout }) {
               <button className="dash-btn" onClick={() => navigate("/dashboard")}>Dashboard</button>
             )}
             <button className="dash-btn" onClick={() => navigate("/conocimiento")}>Base de Conocimiento</button>
+            <button className="dash-btn" onClick={() => navigate("/datos")}>Datos</button>
             <select className="rep-sel" value={reporte} onChange={e => setReporte(e.target.value)}>
               {REPORTES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
             </select>

@@ -321,6 +321,40 @@ def editar_cache(req: CacheEditRequest):
 
 
 
+
+# ── Datos Excel ───────────────────────────────────────────
+@app.get("/datos/{coleccion}")
+def listar_datos(coleccion: str, pagina: int = 1, busqueda: str = "", limite: int = 50):
+    if coleccion not in ["persona", "linea_credito", "credito"]:
+        raise HTTPException(status_code=400, detail="Colección no válida")
+    try:
+        col = db[coleccion]
+        filtro = {}
+        if busqueda:
+            filtro = {"$or": [
+                {k: {"$regex": busqueda, "$options": "i"}}
+                for k in ["ID_PERSONA", "RFC", "NOMBRE_CNBV", "ID_LINEACREDITO", "ID_CREDITO", "ID_DISPOSICION"]
+                if col.find_one({k: {"$exists": True}})
+            ]}
+        total = col.count_documents(filtro)
+        skip = (pagina - 1) * limite
+        docs = list(col.find(filtro, {"_id": 0}).skip(skip).limit(limite))
+        return {"total": total, "pagina": pagina, "limite": limite, "datos": docs}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/datos/{coleccion}/columnas")
+def obtener_columnas(coleccion: str):
+    if coleccion not in ["persona", "linea_credito", "credito"]:
+        raise HTTPException(status_code=400, detail="Colección no válida")
+    try:
+        doc = db[coleccion].find_one({}, {"_id": 0, "_archivo": 0, "_cargado": 0})
+        if not doc:
+            return {"columnas": []}
+        return {"columnas": list(doc.keys())}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 # ── Fragmento por fuente y página ────────────────────────
 @app.get("/fragmento")
 def obtener_fragmento(fuente: str, pagina: int):
