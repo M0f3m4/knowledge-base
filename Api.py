@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from pymongo import MongoClient
 from dotenv import load_dotenv
+from linaje_0430 import buscar_linaje
 from Consultar import (
     consultar_campo,
     consultar_calculo,
@@ -221,6 +222,87 @@ def endpoint_consulta(req: ConsultaRequest):
         return result
     except Exception as e:
         print(f"❌ Error consulta: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── Linaje ────────────────────────────────────────────────
+@app.post("/linaje")
+def endpoint_linaje(req: ConsultaRequest):
+    try:
+        print(f"📥 linaje: {req.pregunta}")
+        historial = obtener_historial(req.session_id)
+        guardar_mensaje(req.session_id, "user", req.pregunta, cmd="linaje")
+
+        # Buscar linaje en el mapa del Excel
+        campo, linaje_excel = buscar_linaje(req.pregunta)
+
+        # Contexto del linaje para enriquecer el prompt
+        contexto_linaje = ""
+        if campo and linaje_excel:
+            contexto_linaje = f"Según el caso de prueba del reporte 0430, el campo {campo} tiene el siguiente linaje: {linaje_excel}. "
+
+        # Consultar el Knowledge Base para más detalle
+        from Consultar import consultar_campo, consultar_calculo
+        argumento = f"{req.pregunta} {req.reporte or '0430'}".strip()
+
+        resultado_campo  = consultar_campo(argumento, historial=historial)
+        resultado_calculo = consultar_calculo(argumento, historial=historial)
+
+        # Combinar todo en un prompt final
+        from langchain_ollama import OllamaLLM
+        import os
+        llm = OllamaLLM(model="mistral:7b-instruct", base_url=os.getenv("OLLAMA_URL"))
+
+        # Buscar específicamente en el Anexo si el campo es calculado
+        es_calculado = linaje_excel and "CALCULADO" in linaje_excel.upper()
+        consulta_anexo = ""
+        if es_calculado:
+            from Consultar import consultar_libre
+            resultado_anexo = consultar_libre(
+                f"fórmula exacta cálculo {campo or req.pregunta} Anexo posiciones dígitos",
+                reporte="0430",
+                historial=[]
+            )
+            consulta_anexo = f"""
+Información del Anexo sobre la fórmula exacta:
+{resultado_anexo.get('respuesta', '')}
+"""
+
+        prompt = f"""Eres un experto en regulación bancaria CNBV. Explica el linaje del campo '{campo or req.pregunta}' del reporte 0430 de forma precisa y en español.
+
+{contexto_linaje}
+
+Información regulatoria sobre el origen del campo:
+{resultado_campo.get('respuesta', '')}
+
+Información sobre cómo se calcula o transforma:
+{resultado_calculo.get('respuesta', '')}
+{consulta_anexo}
+INSTRUCCIONES IMPORTANTES:
+- Responde ÚNICAMENTE sobre el campo '{campo or req.pregunta}', no menciones otros campos
+- Si el campo es calculado, incluye la fórmula COMPLETA con todas las partes, posiciones y dígitos exactos
+- Si el campo viene de un insumo, indica exactamente de qué hoja (PERSONA, LINEA_CREDITO, CREDITO) y columna
+- Si hay ajustes (formato de fecha, guion bajo en RFC, valorización), explícalos
+- Sé conciso pero completo
+
+Estructura tu respuesta así:
+1. Origen: de dónde proviene (hoja y columna, o que es calculado)
+2. Cómo se obtiene: fórmula completa o transformación aplicada
+3. Notas: ajustes, formatos o condiciones especiales
+"""
+        respuesta = llm.invoke(prompt)
+
+        # Combinar fuentes
+        fuentes = list({
+            f"{f['fuente']}_{f['pagina']}": f
+            for f in (resultado_campo.get("fuentes", []) + resultado_calculo.get("fuentes", []))
+        }.values())
+
+        guardar_mensaje(req.session_id, "bot", respuesta, fuentes, cmd="linaje")
+        return {"respuesta": respuesta, "fuentes": fuentes, "campo": campo, "linaje_excel": linaje_excel}
+
+    except Exception as e:
+        print(f"❌ Error linaje: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # ── Feedback ──────────────────────────────────────────────

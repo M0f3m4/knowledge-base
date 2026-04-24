@@ -10,6 +10,7 @@ const CMDS = [
   { id: "campo",    label: "Campo",    ph: "RFC  /  20  /  municipio" },
   { id: "calculo",  label: "Cálculo",  ph: "20  /  municipio destino" },
   { id: "reporte",  label: "Reporte",  ph: "Selecciona el reporte arriba" },
+  { id: "linaje",   label: "Linaje",   ph: "RFC  /  municipio  /  monto valorizado" },
 ]
 
 const REPORTES = [
@@ -23,8 +24,10 @@ function FuenteTag({ f }) {
   const [tooltip, setTooltip] = useState(null)
   const [pos, setPos] = useState({ x: 0, y: 0 })
   const [loading, setLoading] = useState(false)
+  const hideTimer = useRef(null)
 
   const mostrar = async (e) => {
+    if (hideTimer.current) { clearTimeout(hideTimer.current); hideTimer.current = null }
     setPos({ x: e.clientX, y: e.clientY })
     if (tooltip !== null) return
     setLoading(true)
@@ -39,7 +42,17 @@ function FuenteTag({ f }) {
     }
   }
 
-  const ocultar = () => setTooltip(null)
+  const ocultar = () => {
+    hideTimer.current = setTimeout(() => {
+      setTooltip(null)
+      setLoading(false)
+      hideTimer.current = null
+    }, 120)
+  }
+
+  const cancelarOcultar = () => {
+    if (hideTimer.current) { clearTimeout(hideTimer.current); hideTimer.current = null }
+  }
 
   return (
     <span
@@ -57,6 +70,8 @@ function FuenteTag({ f }) {
             left: Math.min(pos.x + 12, window.innerWidth - 340),
             top: Math.min(pos.y + 12, window.innerHeight - 200),
           }}
+          onMouseEnter={cancelarOcultar}
+          onMouseLeave={ocultar}
         >
           {loading ? "Cargando…" : tooltip}
         </div>
@@ -78,7 +93,8 @@ function Fuentes({ fuentes }) {
 }
 
 function Burbuja({ m, onFeedback }) {
-  const [voto, setVoto] = useState(null)
+  const votoKey = `voto_${m.session_id || ""}_${m.texto?.slice(0, 40)}`
+  const [voto, setVoto] = useState(() => localStorage.getItem(votoKey) || null)
   const [mostrarNota, setMostrarNota] = useState(false)
   const [nota, setNota] = useState("")
 
@@ -88,12 +104,14 @@ function Burbuja({ m, onFeedback }) {
       setMostrarNota(true)
     } else {
       setVoto("up")
+      localStorage.setItem(votoKey, "up")
       onFeedback && onFeedback(m, "up", "")
     }
   }
 
   const enviarDown = () => {
     setVoto("down")
+    localStorage.setItem(votoKey, "down")
     setMostrarNota(false)
     onFeedback && onFeedback(m, "down", nota)
   }
@@ -142,6 +160,7 @@ const PASOS = {
   campo:    ["Identificando campo…", "Buscando fragmentos…", "Rerankeando resultados…", "Generando respuesta…"],
   calculo:  ["Identificando campo…", "Buscando fórmulas…", "Rerankeando resultados…", "Calculando respuesta…"],
   reporte:  ["Cargando campos del reporte…"],
+  linaje:   ["Buscando origen del campo…", "Consultando Knowledge Base…", "Combinando fuentes…", "Generando linaje…"],
 }
 
 function Dots({ cmd }) {
@@ -257,7 +276,8 @@ export default function App({ auth, onLogout }) {
       const body = { pregunta: q, reporte: reporte || null, session_id: sid }
       const config = { signal: controller.signal }
       let r
-      if (cmd === "consulta") r = await axios.post(`${API}/consulta`, body, config)
+      if (cmd === "linaje")   r = await axios.post(`${API}/linaje`, body, config)
+      else if (cmd === "consulta") r = await axios.post(`${API}/consulta`, body, config)
       else if (cmd === "campo")   r = await axios.post(`${API}/campo`, body, config)
       else if (cmd === "calculo") r = await axios.post(`${API}/calculo`, body, config)
       else if (cmd === "reporte") r = await axios.post(`${API}/reporte`, { ...body, pregunta: reporte || q }, config)

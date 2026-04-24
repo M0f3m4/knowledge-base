@@ -16,8 +16,9 @@ load_dotenv()
 
 mongo = MongoClient(os.getenv("MONGO_URI"))
 db = mongo[os.getenv("DB_NAME")]
-docs   = db["documentos"]
-cache  = db["cache"]
+docs      = db["documentos"]
+cache     = db["cache"]
+feedback  = db["feedback"]
 
 VOYAGE_KEY          = os.getenv("VOYAGE_API_KEY")
 VOYAGE_EMBED_URL    = "https://ai.mongodb.com/v1/embeddings"
@@ -43,13 +44,11 @@ REGLAS = """REGLAS ESTRICTAS:
 # ══════════════════════════════════════════════════════════
 
 def cache_key(pregunta, cmd, reporte):
-    """Genera una clave única para la combinación pregunta+cmd+reporte"""
     texto = f"{pregunta.lower().strip()}|{cmd}|{reporte or ''}"
     return hashlib.md5(texto.encode()).hexdigest()
 
 
 def buscar_cache(pregunta, cmd, reporte):
-    """Busca en caché una respuesta previa"""
     key = cache_key(pregunta, cmd, reporte)
     print(f"🔎 Buscando cache: {cmd} | {pregunta[:40]}")
     resultado = cache.find_one({"key": key})
@@ -60,7 +59,6 @@ def buscar_cache(pregunta, cmd, reporte):
 
 
 def guardar_cache(pregunta, cmd, reporte, respuesta, fuentes):
-    """Guarda una respuesta en caché"""
     key = cache_key(pregunta, cmd, reporte)
     cache.update_one(
         {"key": key},
@@ -76,6 +74,52 @@ def guardar_cache(pregunta, cmd, reporte, respuesta, fuentes):
         upsert=True
     )
     print(f"💾 Cache guardado: {cmd} | {pregunta[:40]}")
+
+
+# ══════════════════════════════════════════════════════════
+# FEW-SHOT DESDE FEEDBACK
+# ══════════════════════════════════════════════════════════
+
+def buscar_ejemplos(pregunta, cmd, reporte, max_ejemplos=3):
+    """
+    Busca en feedback respuestas bien calificadas (👍) similares a la pregunta actual.
+    Las devuelve formateadas como ejemplos few-shot para el prompt.
+    """
+    try:
+        # Obtener preguntas con voto positivo del mismo comando
+        votos_positivos = list(feedback.find(
+            {"voto": "up", "cmd": cmd},
+            {"pregunta": 1, "respuesta": 1, "_id": 0}
+        ).sort("timestamp", -1).limit(50))
+
+        if not votos_positivos:
+            return ""
+
+        # Filtrar los más relevantes por palabras en común
+        palabras_query = set(pregunta.lower().split())
+        scored = []
+        for voto in votos_positivos:
+            palabras_ejemplo = set(voto["pregunta"].lower().split())
+            coincidencias = len(palabras_query & palabras_ejemplo)
+            if coincidencias > 0:
+                scored.append((coincidencias, voto))
+
+        scored.sort(key=lambda x: x[0], reverse=True)
+        mejores = [v for _, v in scored[:max_ejemplos]]
+
+        if not mejores:
+            return ""
+
+        ejemplos = "\nEJEMPLOS DE RESPUESTAS BIEN CALIFICADAS (úsalos como referencia de estilo y precisión):\n"
+        for i, ej in enumerate(mejores, 1):
+            ejemplos += f"\nEjemplo {i}:\nPregunta: {ej['pregunta']}\nRespuesta: {ej['respuesta'][:400]}\n"
+
+        print(f"📚 Few-shot: {len(mejores)} ejemplos encontrados para '{pregunta[:30]}'")
+        return ejemplos
+
+    except Exception as e:
+        print(f"⚠️ Error buscando ejemplos: {e}")
+        return ""
 
 
 # ══════════════════════════════════════════════════════════
@@ -227,7 +271,6 @@ def respuesta_campos_calculados(reporte):
 def consultar_campo(argumento, historial=None):
     campo, reporte = resolver_campo(argumento)
 
-    # Buscar en caché
     cached = buscar_cache(campo, "campo", reporte)
     if cached:
         return {**cached, "campo": campo, "reporte": reporte}
@@ -235,10 +278,12 @@ def consultar_campo(argumento, historial=None):
     fragmentos = buscar(f"{campo} origen descripcion reporte {reporte or ''}", reporte=reporte)
     ctx, fuentes = construir_contexto(fragmentos)
     hist = construir_historial(historial or [])
+    ejemplos = buscar_ejemplos(campo, "campo", reporte)
 
     prompt = f"""[INST] Eres experto en regulación bancaria CNBV. Responde SOLO en español.
 {REGLAS}
 {hist}
+{ejemplos}
 
 Responde sobre "{campo}" con EXACTAMENTE estas 5 líneas en español, nada más:
 - CAMPO: {campo}
@@ -269,10 +314,12 @@ def consultar_calculo(argumento, historial=None):
     fragmentos = buscar(f"calcular {campo} formula metodologia", top_k=6, reporte=reporte)
     ctx, fuentes = construir_contexto(fragmentos)
     hist = construir_historial(historial or [])
+    ejemplos = buscar_ejemplos(campo, "calculo", reporte)
 
     prompt = f"""[INST] Eres experto en regulación bancaria CNBV. Responde SOLO en español.
 {REGLAS}
 {hist}
+{ejemplos}
 
 Explica el cálculo de "{campo}" con EXACTAMENTE estas 6 líneas en español, nada más:
 - CAMPO: {campo}
@@ -335,7 +382,6 @@ Responde SOLO en español con la tabla indicada.
 def consultar_libre(pregunta, reporte=None, historial=None):
     pregunta_lower = pregunta.lower()
 
-    # Caso especial: campos calculados
     reporte_mencionado = reporte
     if not reporte_mencionado:
         for r in ["0430", "0431", "0432"]:
@@ -348,20 +394,20 @@ def consultar_libre(pregunta, reporte=None, historial=None):
         if resp:
             return {"respuesta": resp, "fuentes": []}
 
-    # Buscar en caché
     cached = buscar_cache(pregunta, "consulta", reporte)
     if cached:
         return cached
 
-    # Flujo normal con query expansion
     query = expandir_query(pregunta)
     fragmentos = buscar(query, top_k=8, reporte=reporte)
     ctx, fuentes = construir_contexto(fragmentos)
     hist = construir_historial(historial or [])
+    ejemplos = buscar_ejemplos(pregunta, "consulta", reporte)
 
     prompt = f"""[INST] Eres experto en regulación bancaria mexicana CNBV. Responde SOLO en español.
 {REGLAS}
 {hist}
+{ejemplos}
 
 Responde la pregunta en español usando solo los fragmentos.
 Sé específico y concreto. Cita página y documento cuando uses información específica.
