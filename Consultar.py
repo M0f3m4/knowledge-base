@@ -43,23 +43,82 @@ REGLAS = """REGLAS ESTRICTAS:
 # CACHÉ
 # ══════════════════════════════════════════════════════════
 
+SIMILITUD_MINIMA = 0.85  # umbral de similitud semántica para cache hit
+
+
 def cache_key(pregunta, cmd, reporte):
     texto = f"{pregunta.lower().strip()}|{cmd}|{reporte or ''}"
     return hashlib.md5(texto.encode()).hexdigest()
 
 
+def similitud_coseno(v1, v2):
+    """Calcula similitud coseno entre dos vectores"""
+    dot = sum(a * b for a, b in zip(v1, v2))
+    mag1 = sum(a ** 2 for a in v1) ** 0.5
+    mag2 = sum(b ** 2 for b in v2) ** 0.5
+    if mag1 == 0 or mag2 == 0:
+        return 0
+    return dot / (mag1 * mag2)
+
+
 def buscar_cache(pregunta, cmd, reporte):
+    # 1. Búsqueda exacta por MD5
     key = cache_key(pregunta, cmd, reporte)
     print(f"🔎 Buscando cache: {cmd} | {pregunta[:40]}")
     resultado = cache.find_one({"key": key})
     if resultado:
-        print(f"⚡ Cache hit: {pregunta[:50]}")
-        return {"respuesta": resultado["respuesta"], "fuentes": resultado["fuentes"]}
+        print(f"⚡ Cache hit exacto: {pregunta[:50]}")
+        return {"respuesta": resultado["respuesta"], "fuentes": resultado.get("fuentes", [])}
+
+    # 2. Búsqueda semántica por similitud de embeddings
+    # Si la pregunta contiene números, no usar cache semántico — podría confundir campos distintos
+    import re
+    tiene_numeros = bool(re.search(r'\b\d+\b', pregunta))
+    if tiene_numeros:
+        print(f"⏭️ Cache semántico omitido (pregunta con números)")
+        return None
+
+    try:
+        vector_pregunta = embedding(pregunta)
+        candidatos = list(cache.find(
+            {"cmd": cmd, "vector": {"$exists": True}},
+            {"pregunta": 1, "respuesta": 1, "fuentes": 1, "vector": 1, "_id": 0}
+        ))
+
+        mejor_score = 0
+        mejor_resultado = None
+
+        for c in candidatos:
+            if not c.get("vector"):
+                continue
+            # Omitir candidatos con números diferentes a la pregunta actual
+            numeros_candidato = set(re.findall(r'\b\d+\b', c.get('pregunta', '')))
+            numeros_pregunta  = set(re.findall(r'\b\d+\b', pregunta))
+            if numeros_candidato != numeros_pregunta:
+                continue
+            score = similitud_coseno(vector_pregunta, c["vector"])
+            if score > mejor_score:
+                mejor_score = score
+                mejor_resultado = c
+
+        if mejor_score >= SIMILITUD_MINIMA and mejor_resultado:
+            print(f"⚡ Cache hit semántico ({mejor_score:.3f}): {mejor_resultado['pregunta'][:50]}")
+            return {"respuesta": mejor_resultado["respuesta"], "fuentes": mejor_resultado.get("fuentes", [])}
+
+        print(f"❌ Cache miss (mejor score: {mejor_score:.3f})")
+    except Exception as e:
+        print(f"⚠️ Error en cache semántico: {e}")
+
     return None
 
 
 def guardar_cache(pregunta, cmd, reporte, respuesta, fuentes):
     key = cache_key(pregunta, cmd, reporte)
+    try:
+        vector = embedding(pregunta)
+    except:
+        vector = None
+
     cache.update_one(
         {"key": key},
         {"$set": {
@@ -69,6 +128,7 @@ def guardar_cache(pregunta, cmd, reporte, respuesta, fuentes):
             "reporte": reporte,
             "respuesta": respuesta,
             "fuentes": fuentes,
+            "vector": vector,
             "timestamp": datetime.utcnow()
         }},
         upsert=True
@@ -171,20 +231,66 @@ def reranker(pregunta, fragmentos, top_k=5):
     return reranked
 
 
-def expandir_query(pregunta):
+def generar_respuesta_hipotetica(pregunta):
+    """
+    HyDE — Hypothetical Document Embeddings
+    Genera una respuesta hipotética a la pregunta para mejorar la búsqueda semántica.
+    El embedding de una respuesta hipotética es mucho más similar a los fragmentos reales
+    que el embedding de la pregunta directa.
+    """
     prompt = f"""[INST] Eres experto en regulación bancaria CNBV.
-Reformula esta pregunta en máximo 15 palabras clave técnicas para búsqueda en documentos regulatorios.
-Solo devuelve las palabras clave, sin explicación ni puntuación adicional.
+Escribe un párrafo corto (máximo 80 palabras) que sería la respuesta ideal a esta pregunta,
+usando terminología técnica regulatoria. NO uses conocimiento inventado, solo el estilo.
+Si no sabes la respuesta exacta, escribe algo plausible con el vocabulario correcto.
 
-PREGUNTA: {pregunta}
-[/INST]"""
+Pregunta: {pregunta}
+Respuesta hipotética:[/INST]"""
+    try:
+        respuesta = llm.invoke(prompt).strip()
+        # Si es muy larga, recortar
+        palabras = respuesta.split()
+        if len(palabras) > 100:
+            respuesta = ' '.join(palabras[:100])
+        print(f"💭 HyDE: {respuesta[:80]}…")
+        return respuesta
+    except:
+        return pregunta
+
+
+def expandir_query(pregunta):
+    prompt = f"""[INST] Eres un asistente de búsqueda en documentos regulatorios CNBV.
+Tu única tarea es extraer las palabras clave más importantes de la pregunta para buscar en documentos.
+NO inventes información. NO respondas la pregunta. SOLO extrae palabras clave de lo que se pregunta.
+Devuelve máximo 10 palabras clave separadas por espacios, sin explicación ni puntuación.
+
+Ejemplos:
+Pregunta: ¿Cuáles son los campos del reporte 0430?
+Palabras clave: campos reporte 0430 columnas estructura
+
+Pregunta: ¿Cómo se calcula el RFC del acreditado?
+Palabras clave: RFC acreditado cálculo formato validación
+
+Pregunta: ¿Qué es el tipo de cartera?
+Palabras clave: tipo cartera definición valores catálogo
+
+Pregunta: {pregunta}
+Palabras clave:[/INST]"""
     query_expandida = llm.invoke(prompt).strip()
+    # Si la respuesta es muy larga, es que alucinó — usar pregunta original
+    if len(query_expandida.split()) > 20:
+        print(f"⚠️ Query expansion falló, usando original")
+        return pregunta
     print(f"🔍 Query original: {pregunta}")
     print(f"🔍 Query expandida: {query_expandida}")
     return query_expandida
 
 
 def buscar(pregunta, top_k=5, reporte=None):
+    # Query expansion deshabilitada — voyage-finance-2 entiende mejor la pregunta original
+    # Para rehabilitar: descomentar las siguientes líneas y reemplazar embedding(pregunta)
+    # query_expandida = expandir_query(pregunta)
+    # texto_busqueda = f"{pregunta} {query_expandida}".strip()
+    # vector = embedding(texto_busqueda)
     vector = embedding(pregunta)
     candidatos = top_k * 4
 
@@ -194,7 +300,7 @@ def buscar(pregunta, top_k=5, reporte=None):
                 "index": "vector_index",
                 "path": "vector",
                 "queryVector": vector,
-                "numCandidates": 150,
+                "numCandidates": 300,
                 "limit": candidatos
             }
         },

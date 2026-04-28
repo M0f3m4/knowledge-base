@@ -5,6 +5,7 @@ Las respuestas se guardan en un Excel para revisión manual.
 """
 
 import os
+import sys
 import time
 import requests
 import openpyxl
@@ -14,6 +15,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 API_URL = "http://localhost:8000"
+SESSION_ID = None
 
 # ══════════════════════════════════════════════════════════
 # 100 PREGUNTAS DE REFERENCIA
@@ -147,12 +149,25 @@ PREGUNTAS = [
 # RUNNER
 # ══════════════════════════════════════════════════════════
 
-def preguntar(pregunta, cmd, reporte):
+def crear_sesion():
+    """Crea una sesión real en MongoDB y devuelve su ID"""
+    r = requests.post(f"{API_URL}/sesiones", json={
+        "nombre": "Pruebas de Precisión",
+        "usuario": "admin"
+    }, timeout=10)
+    if r.status_code == 200:
+        session_id = r.json().get("id")
+        print(f"✅ Sesión creada: {session_id}")
+        return session_id
+    raise Exception(f"Error creando sesión: {r.status_code} {r.text}")
+
+
+def preguntar(pregunta, cmd, reporte, session_id):
     """Manda la pregunta al Knowledge Base y devuelve la respuesta"""
     try:
         url = f"{API_URL}/{cmd}"
-        body = {"pregunta": pregunta, "reporte": reporte, "session_id": "prueba_precision"}
-        r = requests.post(url, json=body, timeout=120)
+        body = {"pregunta": pregunta, "reporte": reporte, "session_id": session_id}
+        r = requests.post(url, json=body, timeout=180)
         if r.status_code == 200:
             return r.json().get("respuesta", "Sin respuesta")
         return f"Error {r.status_code}: {r.text[:100]}"
@@ -175,7 +190,6 @@ def generar_excel(resultados, archivo="resultados_precision.xlsx"):
     def align(h='left', wrap=True):
         return Alignment(horizontal=h, vertical='center', wrap_text=wrap)
 
-    # Columnas
     ws.column_dimensions['A'].width = 5
     ws.column_dimensions['B'].width = 10
     ws.column_dimensions['C'].width = 50
@@ -184,7 +198,6 @@ def generar_excel(resultados, archivo="resultados_precision.xlsx"):
     ws.column_dimensions['F'].width = 15
     ws.column_dimensions['G'].width = 10
 
-    # Header
     headers = ['#', 'Categoría', 'Pregunta', 'Comando', 'Respuesta del sistema', 'Calificación', 'Notas']
     header_fill = fill('FF2E75B6')
     for col, h in enumerate(headers, 1):
@@ -194,14 +207,12 @@ def generar_excel(resultados, archivo="resultados_precision.xlsx"):
         c.fill = header_fill
         c.alignment = align(h='center')
 
-    # Colores por categoría
     cat_colors = {
         'Simple':     'FFE2EFDA',
         'Intermedia': 'FFFFF2CC',
         'Complicada': 'FFFCE4D6',
     }
 
-    # Datos
     for i, (num, categoria, pregunta, cmd, reporte, respuesta) in enumerate(resultados, 2):
         color = cat_colors.get(categoria, 'FFFFFFFF')
         ws.row_dimensions[i].height = 80
@@ -216,12 +227,9 @@ def generar_excel(resultados, archivo="resultados_precision.xlsx"):
             c.fill = fill(color)
             c.alignment = align(h=aln)
 
-    # Instrucciones en columna F
     ws['F1'].value = 'Calificación'
-    instruccion = ws.cell(row=2, column=7)
-    instruccion.value = 'Usa: ✅ Correcta | ❌ Incorrecta | ⚠️ Parcial'
+    ws.cell(row=2, column=7).value = 'Usa: ✅ Correcta | ❌ Incorrecta | ⚠️ Parcial'
 
-    # Totales al final
     total_row = len(resultados) + 3
     ws.cell(row=total_row, column=2).value = 'Total preguntas:'
     ws.cell(row=total_row, column=3).value = len(resultados)
@@ -248,18 +256,19 @@ if __name__ == "__main__":
     print(f"Total preguntas: {len(PREGUNTAS)}")
     print("Asegúrate de que el backend esté corriendo en :8000\n")
 
-    # Crear sesión de prueba
+    # Crear sesión real
     try:
-        requests.post(f"{API_URL}/sesiones", json={"nombre": "prueba_precision", "usuario": "admin"})
-    except:
-        pass
+        SESSION_ID = crear_sesion()
+    except Exception as e:
+        print(f"❌ No se pudo crear la sesión: {e}")
+        sys.exit(1)
 
     resultados = []
     errores = 0
 
     for i, (pregunta, cmd, reporte, categoria) in enumerate(PREGUNTAS, 1):
         print(f"[{i:03d}/{len(PREGUNTAS)}] {categoria:12} | {pregunta[:60]}...")
-        respuesta = preguntar(pregunta, cmd, reporte)
+        respuesta = preguntar(pregunta, cmd, reporte, SESSION_ID)
 
         if respuesta.startswith("Error"):
             errores += 1
@@ -268,7 +277,7 @@ if __name__ == "__main__":
             print(f"         ✅ {respuesta[:80]}...")
 
         resultados.append((i, categoria, pregunta, cmd, reporte, respuesta))
-        time.sleep(0.5)  # pequeña pausa entre preguntas
+        time.sleep(0.5)
 
     print(f"\n{'='*60}")
     print(f"Completado: {len(PREGUNTAS)} preguntas | {errores} errores de conexión")
