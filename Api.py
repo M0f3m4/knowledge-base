@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from pymongo import MongoClient
 from dotenv import load_dotenv
-from linaje_0430 import buscar_linaje
+from linaje_0430 import buscar_linaje, parsear_linaje, NUMERO_CAMPO_0430
 from Consultar import (
     consultar_campo,
     consultar_calculo,
@@ -44,13 +44,14 @@ def obtener_historial(session_id, limite=6):
         {"tipo": 1, "texto": 1, "_id": 0}
     ).sort("timestamp", -1).limit(limite))[::-1]
 
-def guardar_mensaje(session_id, tipo, texto, fuentes=None, cmd=None):
+def guardar_mensaje(session_id, tipo, texto, fuentes=None, cmd=None, tabla=None):
     mensajes.insert_one({
         "session_id": session_id,
         "tipo": tipo,
         "texto": texto,
         "fuentes": fuentes or [],
         "cmd": cmd,
+        "tabla": tabla,
         "timestamp": datetime.utcnow()
     })
     sesiones.update_one(
@@ -298,8 +299,19 @@ Estructura tu respuesta así:
             for f in (resultado_campo.get("fuentes", []) + resultado_calculo.get("fuentes", []))
         }.values())
 
-        guardar_mensaje(req.session_id, "bot", respuesta, fuentes, cmd="linaje")
-        return {"respuesta": respuesta, "fuentes": fuentes, "campo": campo, "linaje_excel": linaje_excel}
+        # Buscar número de campo
+        numero = None
+        for num, c in NUMERO_CAMPO_0430.items():
+            if c == campo:
+                numero = num
+                break
+
+        # Parsear linaje para tabla estructurada
+        tabla = parsear_linaje(campo, linaje_excel, numero) if campo else None
+
+        guardar_mensaje(req.session_id, "bot", respuesta, fuentes, cmd="linaje", tabla=tabla)
+
+        return {"respuesta": respuesta, "fuentes": fuentes, "campo": campo, "linaje_excel": linaje_excel, "tabla": tabla}
 
     except Exception as e:
         print(f"❌ Error linaje: {e}")

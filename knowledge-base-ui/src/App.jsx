@@ -92,6 +92,94 @@ function Fuentes({ fuentes }) {
   )
 }
 
+function CeldaTooltip({ label, value, children }) {
+  const [show, setShow] = useState(false)
+  const [pos, setPos]   = useState({ x: 0, y: 0 })
+  if (!value || value === '—') return <td>—</td>
+  return (
+    <td
+      className="linaje-td-hover"
+      onMouseEnter={e => { setShow(true); setPos({ x: e.clientX, y: e.clientY }) }}
+      onMouseLeave={() => setShow(false)}
+    >
+      <span className="linaje-td-preview">{children || value}</span>
+      {show && (
+        <div className="linaje-cell-tooltip" style={{
+          position: 'fixed',
+          left: Math.min(pos.x + 14, window.innerWidth - 320),
+          top: Math.min(pos.y + 14, window.innerHeight - 160),
+        }}>
+          {label && <div className="linaje-cell-tooltip-label">{label}</div>}
+          {value}
+        </div>
+      )}
+    </td>
+  )
+}
+
+function TablaLinaje({ tabla }) {
+  if (!tabla) return null
+  return (
+    <div className="linaje-tabla">
+      <div className="linaje-tabla-title">📊 Linaje del campo</div>
+      <div className="linaje-tabla-wrapper">
+      <table className="linaje-tbl">
+        <thead>
+          <tr>
+            <th>Campo</th>
+            <th>#</th>
+            <th>Origen</th>
+            <th>Hoja Excel</th>
+            <th>Columna Excel</th>
+            <th>Tipo</th>
+            <th>Obligatorio</th>
+            <th>Formato</th>
+            <th>Catálogo</th>
+            <th>Condiciones</th>
+            <th>Relacionados</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>{tabla.campo}</td>
+            <td>{tabla.numero || '—'}</td>
+            <td>
+              <span className={`linaje-badge ${tabla.origen === 'Calculado' ? 'calc' : tabla.origen === 'Default' ? 'def' : 'ins'}`}>
+                {tabla.origen}
+              </span>
+            </td>
+            <td>{tabla.hoja_excel}</td>
+            <td className="linaje-col">{tabla.columna_excel}</td>
+            <td>{tabla.tipo}</td>
+            <td>
+              <span className={`linaje-badge ${tabla.obligatorio === 'Sí' ? 'ins' : tabla.obligatorio === 'No' ? 'def' : 'calc'}`}>
+                {tabla.obligatorio || '—'}
+              </span>
+            </td>
+            <CeldaTooltip label="Formato / Longitud" value={tabla.formato}>
+              {tabla.formato?.split(',')[0]}
+            </CeldaTooltip>
+            <CeldaTooltip label="Catálogo" value={tabla.catalogo}>
+              {tabla.catalogo?.length > 20 ? tabla.catalogo.slice(0, 18) + '…' : tabla.catalogo}
+            </CeldaTooltip>
+            <CeldaTooltip label="Condiciones" value={tabla.condiciones}>
+              {tabla.condiciones?.slice(0, 22) + '…'}
+            </CeldaTooltip>
+            <td>
+              {tabla.relacionados?.length
+                ? tabla.relacionados.map((r, i) => (
+                    <span key={i} className="linaje-rel">{r}</span>
+                  ))
+                : '—'}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      </div>
+    </div>
+  )
+}
+
 function Burbuja({ m, onFeedback }) {
   const votoKey = `voto_${m.session_id || ""}_${m.texto?.slice(0, 40)}`
   const [voto, setVoto] = useState(() => localStorage.getItem(votoKey) || null)
@@ -119,7 +207,8 @@ function Burbuja({ m, onFeedback }) {
   return (
     <div className={`burbuja ${m.tipo}`}>
       {m.tipo === "bot" && <div className="bot-label">CNBV</div>}
-      <div className="burbuja-inner">
+      <div className={m.tabla ? "burbuja-inner burbuja-linaje" : "burbuja-inner"}>
+        {m.tabla && <TablaLinaje tabla={m.tabla} />}
         <pre>{m.texto}</pre>
         <Fuentes fuentes={m.fuentes} />
         {m.tipo === "bot" && m.texto !== "¿En qué puedo ayudarte?" && m.texto !== "Sesión vacía. ¿En qué puedo ayudarte?" && (
@@ -282,7 +371,7 @@ export default function App({ auth, onLogout }) {
       else if (cmd === "calculo") r = await axios.post(`${API}/calculo`, body, config)
       else if (cmd === "reporte") r = await axios.post(`${API}/reporte`, { ...body, pregunta: reporte || q }, config)
 
-      setMsgs(p => [...p, { tipo: "bot", texto: r.data.respuesta, fuentes: r.data.fuentes }])
+      setMsgs(p => [...p, { tipo: "bot", texto: r.data.respuesta, fuentes: r.data.fuentes, tabla: r.data.tabla || null, cmd: cmd }])
 
       const s = sesiones.find(x => x.id === sid)
       if (s?.nombre.startsWith("Sesión")) {
