@@ -23,8 +23,16 @@ feedback  = db["feedback"]
 VOYAGE_KEY          = os.getenv("VOYAGE_API_KEY")
 VOYAGE_EMBED_URL    = "https://ai.mongodb.com/v1/embeddings"
 VOYAGE_RERANK_URL   = "https://ai.mongodb.com/v1/rerank"
-VOYAGE_MODEL        = "voyage-finance-2"
-VOYAGE_RERANK_MODEL = "rerank-2.5"
+
+# Modelo para indexar documentos (debe coincidir con el índice en Atlas)
+VOYAGE_MODEL        = os.getenv("VOYAGE_EMBED_MODEL", "voyage-finance-2")
+# Modelo para queries — puede ser diferente para pruebas sin re-indexar
+VOYAGE_QUERY_MODEL  = os.getenv("VOYAGE_QUERY_MODEL", "voyage-finance-2")
+VOYAGE_RERANK_MODEL = os.getenv("VOYAGE_RERANK_MODEL", "rerank-2.5")
+
+print(f"🚀 Voyage embed model:  {VOYAGE_MODEL}")
+print(f"🔍 Voyage query model:  {VOYAGE_QUERY_MODEL}")
+print(f"🔀 Voyage rerank model: {VOYAGE_RERANK_MODEL}")
 
 llm = OllamaLLM(
     model="mistral:7b-instruct",
@@ -43,7 +51,7 @@ REGLAS = """REGLAS ESTRICTAS:
 # CACHÉ
 # ══════════════════════════════════════════════════════════
 
-SIMILITUD_MINIMA = 0.85  # umbral de similitud semántica para cache hit
+SIMILITUD_MINIMA = 0.85
 
 
 def cache_key(pregunta, cmd, reporte):
@@ -52,7 +60,6 @@ def cache_key(pregunta, cmd, reporte):
 
 
 def similitud_coseno(v1, v2):
-    """Calcula similitud coseno entre dos vectores"""
     dot = sum(a * b for a, b in zip(v1, v2))
     mag1 = sum(a ** 2 for a in v1) ** 0.5
     mag2 = sum(b ** 2 for b in v2) ** 0.5
@@ -62,7 +69,6 @@ def similitud_coseno(v1, v2):
 
 
 def buscar_cache(pregunta, cmd, reporte):
-    # 1. Búsqueda exacta por MD5
     key = cache_key(pregunta, cmd, reporte)
     print(f"🔎 Buscando cache: {cmd} | {pregunta[:40]}")
     resultado = cache.find_one({"key": key})
@@ -70,8 +76,6 @@ def buscar_cache(pregunta, cmd, reporte):
         print(f"⚡ Cache hit exacto: {pregunta[:50]}")
         return {"respuesta": resultado["respuesta"], "fuentes": resultado.get("fuentes", [])}
 
-    # 2. Búsqueda semántica por similitud de embeddings
-    # Si la pregunta contiene números, no usar cache semántico — podría confundir campos distintos
     import re
     tiene_numeros = bool(re.search(r'\b\d+\b', pregunta))
     if tiene_numeros:
@@ -79,7 +83,7 @@ def buscar_cache(pregunta, cmd, reporte):
         return None
 
     try:
-        vector_pregunta = embedding(pregunta)
+        vector_pregunta = embedding(pregunta, query=True)
         candidatos = list(cache.find(
             {"cmd": cmd, "vector": {"$exists": True}},
             {"pregunta": 1, "respuesta": 1, "fuentes": 1, "vector": 1, "_id": 0}
@@ -91,7 +95,6 @@ def buscar_cache(pregunta, cmd, reporte):
         for c in candidatos:
             if not c.get("vector"):
                 continue
-            # Omitir candidatos con números diferentes a la pregunta actual
             numeros_candidato = set(re.findall(r'\b\d+\b', c.get('pregunta', '')))
             numeros_pregunta  = set(re.findall(r'\b\d+\b', pregunta))
             if numeros_candidato != numeros_pregunta:
@@ -115,7 +118,7 @@ def buscar_cache(pregunta, cmd, reporte):
 def guardar_cache(pregunta, cmd, reporte, respuesta, fuentes):
     key = cache_key(pregunta, cmd, reporte)
     try:
-        vector = embedding(pregunta)
+        vector = embedding(pregunta, query=True)
     except:
         vector = None
 
@@ -141,12 +144,7 @@ def guardar_cache(pregunta, cmd, reporte, respuesta, fuentes):
 # ══════════════════════════════════════════════════════════
 
 def buscar_ejemplos(pregunta, cmd, reporte, max_ejemplos=3):
-    """
-    Busca en feedback respuestas bien calificadas (👍) similares a la pregunta actual.
-    Las devuelve formateadas como ejemplos few-shot para el prompt.
-    """
     try:
-        # Obtener preguntas con voto positivo del mismo comando
         votos_positivos = list(feedback.find(
             {"voto": "up", "cmd": cmd},
             {"pregunta": 1, "respuesta": 1, "_id": 0}
@@ -155,7 +153,6 @@ def buscar_ejemplos(pregunta, cmd, reporte, max_ejemplos=3):
         if not votos_positivos:
             return ""
 
-        # Filtrar los más relevantes por palabras en común
         palabras_query = set(pregunta.lower().split())
         scored = []
         for voto in votos_positivos:
@@ -186,11 +183,16 @@ def buscar_ejemplos(pregunta, cmd, reporte, max_ejemplos=3):
 # NÚCLEO
 # ══════════════════════════════════════════════════════════
 
-def embedding(texto):
+def embedding(texto, query=False):
+    """
+    query=True  → usa VOYAGE_QUERY_MODEL (configurable en .env para pruebas)
+    query=False → usa VOYAGE_MODEL (debe coincidir con el índice de Atlas)
+    """
+    modelo = VOYAGE_QUERY_MODEL if query else VOYAGE_MODEL
     r = requests.post(
         VOYAGE_EMBED_URL,
         headers={"Authorization": f"Bearer {VOYAGE_KEY}", "Content-Type": "application/json"},
-        json={"input": [texto], "model": VOYAGE_MODEL}
+        json={"input": [texto], "model": modelo}
     )
     if r.status_code != 200:
         raise Exception(f"Voyage embed error {r.status_code}: {r.text}")
@@ -232,22 +234,15 @@ def reranker(pregunta, fragmentos, top_k=5):
 
 
 def generar_respuesta_hipotetica(pregunta):
-    """
-    HyDE — Hypothetical Document Embeddings
-    Genera una respuesta hipotética a la pregunta para mejorar la búsqueda semántica.
-    El embedding de una respuesta hipotética es mucho más similar a los fragmentos reales
-    que el embedding de la pregunta directa.
-    """
+    """HyDE — disponible pero deshabilitado, ver buscar()"""
     prompt = f"""[INST] Eres experto en regulación bancaria CNBV.
 Escribe un párrafo corto (máximo 80 palabras) que sería la respuesta ideal a esta pregunta,
 usando terminología técnica regulatoria. NO uses conocimiento inventado, solo el estilo.
-Si no sabes la respuesta exacta, escribe algo plausible con el vocabulario correcto.
 
 Pregunta: {pregunta}
 Respuesta hipotética:[/INST]"""
     try:
         respuesta = llm.invoke(prompt).strip()
-        # Si es muy larga, recortar
         palabras = respuesta.split()
         if len(palabras) > 100:
             respuesta = ' '.join(palabras[:100])
@@ -276,7 +271,6 @@ Palabras clave: tipo cartera definición valores catálogo
 Pregunta: {pregunta}
 Palabras clave:[/INST]"""
     query_expandida = llm.invoke(prompt).strip()
-    # Si la respuesta es muy larga, es que alucinó — usar pregunta original
     if len(query_expandida.split()) > 20:
         print(f"⚠️ Query expansion falló, usando original")
         return pregunta
@@ -287,11 +281,11 @@ Palabras clave:[/INST]"""
 
 def buscar(pregunta, top_k=5, reporte=None):
     # Query expansion deshabilitada — voyage-finance-2 entiende mejor la pregunta original
-    # Para rehabilitar: descomentar las siguientes líneas y reemplazar embedding(pregunta)
+    # Para rehabilitar tras fine-tuning: descomentar las siguientes líneas
     # query_expandida = expandir_query(pregunta)
     # texto_busqueda = f"{pregunta} {query_expandida}".strip()
-    # vector = embedding(texto_busqueda)
-    vector = embedding(pregunta)
+    # vector = embedding(texto_busqueda, query=True)
+    vector = embedding(pregunta, query=True)
     candidatos = top_k * 4
 
     pipeline = [
@@ -504,8 +498,7 @@ def consultar_libre(pregunta, reporte=None, historial=None):
     if cached:
         return cached
 
-    query = expandir_query(pregunta)
-    fragmentos = buscar(query, top_k=8, reporte=reporte)
+    fragmentos = buscar(pregunta, top_k=8, reporte=reporte)
     ctx, fuentes = construir_contexto(fragmentos)
     hist = construir_historial(historial or [])
     ejemplos = buscar_ejemplos(pregunta, "consulta", reporte)
