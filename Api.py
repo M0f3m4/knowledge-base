@@ -5,9 +5,11 @@ from bson import ObjectId
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from typing import Optional
 from pymongo import MongoClient
 from dotenv import load_dotenv
 from linaje_0430 import buscar_linaje, parsear_linaje, NUMERO_CAMPO_0430
+from validaciones_0430 import buscar_validaciones, buscar_validaciones_libre
 from Consultar import (
     consultar_campo,
     consultar_calculo,
@@ -18,6 +20,14 @@ from Consultar import (
 load_dotenv()
 
 app = FastAPI(title="Knowledge Base CNBV")
+
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request, exc):
+    print(f"❌ Validation error body: {exc.errors()}")
+    return JSONResponse(status_code=422, content={"detail": exc.errors()})
 
 app.add_middleware(
     CORSMiddleware,
@@ -78,23 +88,40 @@ class SesionUpdate(BaseModel):
 
 class ConsultaRequest(BaseModel):
     pregunta: str
-    reporte: str = None
+    reporte: Optional[str] = None
     session_id: str
+    top_k: int = 10
+
+    def model_post_init(self, __context):
+        if self.reporte is not None and self.reporte.strip() == "":
+            object.__setattr__(self, "reporte", None)
+
+    @property
+    def reporte_limpio(self):
+        return self.reporte if self.reporte else None
 
 class FeedbackRequest(BaseModel):
     session_id: str
     pregunta: str
     respuesta: str
     cmd: str
-    reporte: str = None
+    reporte: Optional[str] = None
     voto: str
     nota: str = ""
+
+    @property
+    def reporte_limpio(self):
+        return self.reporte if self.reporte and self.reporte.strip() else None
 
 class CacheEditRequest(BaseModel):
     pregunta: str
     cmd: str
-    reporte: str = None
+    reporte: Optional[str] = None
     respuesta_corregida: str
+
+    @property
+    def reporte_limpio(self):
+        return self.reporte if self.reporte and self.reporte.strip() else None
 
 # ── Auth ──────────────────────────────────────────────────
 @app.post("/login")
@@ -176,7 +203,7 @@ def endpoint_campo(req: ConsultaRequest):
     try:
         print(f"📥 campo: {req.pregunta} | {req.reporte}")
         historial = obtener_historial(req.session_id)
-        argumento = f"{req.pregunta} {req.reporte}".strip() if req.reporte else req.pregunta
+        argumento = f"{req.pregunta} {req.reporte_limpio}".strip() if req.reporte_limpio else req.pregunta
         guardar_mensaje(req.session_id, "user", req.pregunta, cmd="campo")
         result = consultar_campo(argumento, historial=historial)
         guardar_mensaje(req.session_id, "bot", result["respuesta"], result.get("fuentes"), cmd="campo")
@@ -190,7 +217,7 @@ def endpoint_calculo(req: ConsultaRequest):
     try:
         print(f"📥 calculo: {req.pregunta} | {req.reporte}")
         historial = obtener_historial(req.session_id)
-        argumento = f"{req.pregunta} {req.reporte}".strip() if req.reporte else req.pregunta
+        argumento = f"{req.pregunta} {req.reporte_limpio}".strip() if req.reporte_limpio else req.pregunta
         guardar_mensaje(req.session_id, "user", req.pregunta, cmd="calculo")
         result = consultar_calculo(argumento, historial=historial)
         guardar_mensaje(req.session_id, "bot", result["respuesta"], result.get("fuentes"), cmd="calculo")
@@ -205,7 +232,7 @@ def endpoint_reporte(req: ConsultaRequest):
         print(f"📥 reporte: {req.reporte}")
         historial = obtener_historial(req.session_id)
         guardar_mensaje(req.session_id, "user", req.pregunta, cmd="reporte")
-        result = consultar_reporte(req.reporte or req.pregunta, historial=historial)
+        result = consultar_reporte(req.reporte_limpio or req.pregunta, historial=historial)
         guardar_mensaje(req.session_id, "bot", result["respuesta"], result.get("fuentes"), cmd="reporte")
         return result
     except Exception as e:
@@ -218,7 +245,7 @@ def endpoint_consulta(req: ConsultaRequest):
         print(f"📥 consulta: {req.pregunta} | {req.reporte}")
         historial = obtener_historial(req.session_id)
         guardar_mensaje(req.session_id, "user", req.pregunta, cmd="consulta")
-        result = consultar_libre(req.pregunta, reporte=req.reporte, historial=historial)
+        result = consultar_libre(req.pregunta, reporte=req.reporte_limpio, historial=historial)
         guardar_mensaje(req.session_id, "bot", result["respuesta"], result.get("fuentes"), cmd="consulta")
         return result
     except Exception as e:
@@ -317,6 +344,109 @@ Estructura tu respuesta así:
         print(f"❌ Error linaje: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+# ── Validaciones ──────────────────────────────────────────
+@app.post("/validaciones")
+def endpoint_validaciones(req: ConsultaRequest):
+    try:
+        print(f"📥 validaciones: {req.pregunta} | {req.reporte or '0430'}")
+        reporte = req.reporte_limpio or "0430"
+        guardar_mensaje(req.session_id, "user", req.pregunta, cmd="validaciones")
+
+        numero, nombre, validaciones = buscar_validaciones(req.pregunta, reporte)
+
+        if not validaciones:
+            respuesta = f"No se encontraron validaciones para '{req.pregunta}' en el reporte {reporte}."
+            guardar_mensaje(req.session_id, "bot", respuesta, [], cmd="validaciones", tabla=None)
+            return {"respuesta": respuesta, "fuentes": [], "tabla": None, "validaciones": []}
+
+        # Construir respuesta escrita
+        respuesta = f"Validaciones del campo {numero}. {nombre.split('. ', 1)[-1]} en el reporte {reporte}:\n\n"
+        for i, v in enumerate(validaciones, 1):
+            tipo = f"[{v['tipo_val']}] " if v.get('tipo_val') else ""
+            respuesta += f"{i}. {tipo}{v['descripcion']}\n"
+            if v.get('condicion'):
+                respuesta += f"   → Condición: {v['condicion']}\n"
+        respuesta += f"\nTotal: {len(validaciones)} validaciones"
+
+        # Tabla estructurada para el frontend
+        tabla_val = {
+            "numero": numero,
+            "campo": nombre,
+            "reporte": reporte,
+            "total": len(validaciones),
+            "validaciones": [
+                {
+                    "id": v.get("id_validacion", ""),
+                    "descripcion": v.get("descripcion", ""),
+                    "tipo": v.get("tipo_val", "VALOR"),
+                    "condicion": v.get("condicion", ""),
+                }
+                for v in validaciones
+            ]
+        }
+
+        guardar_mensaje(req.session_id, "bot", respuesta, [], cmd="validaciones", tabla=tabla_val)
+        return {"respuesta": respuesta, "fuentes": [], "tabla": tabla_val, "validaciones": validaciones}
+
+    except Exception as e:
+        print(f"❌ Error validaciones: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── Búsqueda libre en validaciones ────────────────────────
+@app.post("/validaciones/libre")
+def endpoint_validaciones_libre(req: ConsultaRequest):
+    try:
+        print(f"📥 validaciones/libre: {req.pregunta} | {req.reporte or '0430'}")
+        reporte = req.reporte_limpio or "0430"
+        guardar_mensaje(req.session_id, "user", req.pregunta, cmd="val_libre")
+
+        resultados = buscar_validaciones_libre(req.pregunta, reporte, top_k=req.top_k)
+
+        if not resultados:
+            respuesta = f"No se encontraron validaciones relacionadas con '{req.pregunta}'."
+            guardar_mensaje(req.session_id, "bot", respuesta, [], cmd="val_libre", tabla=None)
+            return {"respuesta": respuesta, "fuentes": [], "tabla": None}
+
+        # Construir respuesta
+        respuesta = f"Validaciones relacionadas con: '{req.pregunta}'\n\n"
+        for i, v in enumerate(resultados, 1):
+            campo = v.get("concepto", "")
+            tipo  = f"[{v['tipo_val']}] " if v.get("tipo_val") else ""
+            score = v.get("score", 0)
+            respuesta += f"{i}. {tipo}{v['descripcion']} (similitud: {score})\n"
+            if campo:
+                respuesta += f"   → Campo: {campo}\n"
+            if v.get("condicion"):
+                respuesta += f"   → Condición: {v['condicion']}\n"
+        respuesta += f"\nTotal: {len(resultados)} validaciones encontradas"
+
+        tabla_val = {
+            "numero":       None,
+            "campo":        f"Búsqueda: {req.pregunta[:50]}",
+            "reporte":      reporte,
+            "total":        len(resultados),
+            "validaciones": [
+                {
+                    "id":          v.get("id_validacion", ""),
+                    "descripcion": v.get("descripcion", ""),
+                    "tipo":        v.get("tipo_val", "VALOR"),
+                    "condicion":   v.get("condicion", ""),
+                    "concepto":    v.get("concepto", ""),
+                    "score":       str(v.get("score", "")),
+                }
+                for v in resultados
+            ]
+        }
+
+        guardar_mensaje(req.session_id, "bot", respuesta, [], cmd="val_libre", tabla=tabla_val)
+        return {"respuesta": respuesta, "fuentes": [], "tabla": tabla_val}
+
+    except Exception as e:
+        print(f"❌ Error validaciones/libre: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ── Feedback ──────────────────────────────────────────────
 @app.post("/feedback")
 def endpoint_feedback(req: FeedbackRequest):
@@ -326,7 +456,7 @@ def endpoint_feedback(req: FeedbackRequest):
             "pregunta": req.pregunta,
             "respuesta": req.respuesta,
             "cmd": req.cmd,
-            "reporte": req.reporte,
+            "reporte": req.reporte_limpio,
             "voto": req.voto,
             "nota": req.nota,
             "timestamp": datetime.utcnow()
@@ -396,7 +526,7 @@ def editar_cache(req: CacheEditRequest):
                 "key": key,
                 "pregunta": req.pregunta,
                 "cmd": req.cmd,
-                "reporte": req.reporte,
+                "reporte": req.reporte_limpio,
                 "respuesta": req.respuesta_corregida,
                 "editado": True,
                 "timestamp": datetime.utcnow()

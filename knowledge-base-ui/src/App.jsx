@@ -6,11 +6,13 @@ import "./App.css"
 const API = "http://localhost:8000"
 
 const CMDS = [
-  { id: "consulta", label: "Consulta", ph: "¿Cuál es el objetivo del reporte 0430?" },
-  { id: "campo",    label: "Campo",    ph: "RFC  /  20  /  municipio" },
-  { id: "calculo",  label: "Cálculo",  ph: "20  /  municipio destino" },
-  { id: "reporte",  label: "Reporte",  ph: "Selecciona el reporte arriba" },
-  { id: "linaje",   label: "Linaje",   ph: "RFC  /  municipio  /  monto valorizado" },
+  { id: "consulta",     label: "Consulta",     ph: "¿Cuál es el objetivo del reporte 0430?" },
+  { id: "campo",        label: "Campo",        ph: "RFC  /  20  /  municipio" },
+  { id: "calculo",      label: "Cálculo",      ph: "20  /  municipio destino" },
+  { id: "reporte",      label: "Reporte",      ph: "Selecciona el reporte arriba" },
+  { id: "linaje",       label: "Linaje",       ph: "RFC  /  municipio  /  monto valorizado" },
+  { id: "validaciones", label: "Validaciones", ph: "RFC  /  6  /  tipo cartera" },
+  { id: "val_libre",    label: "Val. Libre 🧪", ph: "¿qué campos no pueden ir vacíos? / validaciones para moneda extranjera" },
 ]
 
 const REPORTES = [
@@ -18,6 +20,13 @@ const REPORTES = [
   { value: "0430", label: "0430 · Altas" },
   { value: "0431", label: "0431 · Seguimiento" },
   { value: "0432", label: "0432 · Bajas" },
+  { value: "0433", label: "0433 · Reservas" },
+  { value: "0434", label: "0434 · Severidad" },
+  { value: "0435", label: "0435 · Prob. Incumplimiento (EF)" },
+  { value: "0436", label: "0436 · Prob. Incumplimiento (PM)" },
+  { value: "0437", label: "0437 · Prob. Incumplimiento (PF)" },
+  { value: "0438", label: "0438 · Calificación Empírica" },
+  { value: "0439", label: "0439 · Método Calificación" },
 ]
 
 function FuenteTag({ f }) {
@@ -88,6 +97,62 @@ function Fuentes({ fuentes }) {
       {u.map((f, i) => (
         <FuenteTag key={i} f={f} />
       ))}
+    </div>
+  )
+}
+
+function TablaValidaciones({ tabla }) {
+  if (!tabla || !tabla.validaciones?.length) return null
+  const esLibre = tabla.validaciones.some(v => v.score)
+  const tipoBadge = (tipo) => {
+    if (!tipo) return 'val-valor'
+    const t = tipo.toUpperCase()
+    if (t === 'VALOR')      return 'val-valor'
+    if (t === 'CATALOGO')   return 'val-catalogo'
+    if (t === 'BLOQUE')     return 'val-bloque'
+    if (t === 'ESTRUCTURA') return 'val-estructura'
+    return 'val-valor'
+  }
+  const title = esLibre
+    ? `🧪 Búsqueda libre — ${tabla.total} resultados`
+    : `✅ Validaciones del campo ${tabla.numero} — ${tabla.total} reglas`
+  return (
+    <div className="linaje-tabla" style={{ marginBottom: 12 }}>
+      <div className="linaje-tabla-title">{title}</div>
+      <div className="linaje-tabla-wrapper">
+        <table className="linaje-tbl">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Tipo</th>
+              {esLibre && <th>Campo</th>}
+              <th>Descripción</th>
+              <th>Condición</th>
+              {esLibre && <th>Similitud</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {tabla.validaciones.map((v, i) => (
+              <tr key={i}>
+                <td style={{ color: 'var(--text2)', minWidth: 30 }}>{i + 1}</td>
+                <td>
+                  <span className={`linaje-badge ${tipoBadge(v.tipo)}`}>
+                    {v.tipo || 'VALOR'}
+                  </span>
+                </td>
+                {esLibre && <td style={{ fontSize: 9, color: '#60a5fa', fontFamily: 'Geist Mono, monospace', whiteSpace: 'normal', maxWidth: 160 }}>{v.concepto || '—'}</td>}
+                <td style={{ fontSize: 10, fontFamily: 'Geist Mono, monospace', maxWidth: 340, whiteSpace: 'normal' }}>
+                  {v.descripcion}
+                </td>
+                <td style={{ fontSize: 9, color: 'var(--text2)', fontFamily: 'Geist Mono, monospace', maxWidth: 200, whiteSpace: 'normal' }}>
+                  {v.condicion || '—'}
+                </td>
+                {esLibre && <td style={{ fontSize: 9, color: '#4ade80', fontFamily: 'Geist Mono, monospace' }}>{v.score}</td>}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }
@@ -208,7 +273,8 @@ function Burbuja({ m, onFeedback }) {
     <div className={`burbuja ${m.tipo}`}>
       {m.tipo === "bot" && <div className="bot-label">CNBV</div>}
       <div className={m.tabla ? "burbuja-inner burbuja-linaje" : "burbuja-inner"}>
-        {m.tabla && <TablaLinaje tabla={m.tabla} />}
+        {(m.cmd === 'validaciones' || m.cmd === 'val_libre') && m.tabla && <TablaValidaciones tabla={m.tabla} />}
+        {m.cmd !== 'validaciones' && m.tabla && <TablaLinaje tabla={m.tabla} />}
         <pre>{m.texto}</pre>
         <Fuentes fuentes={m.fuentes} />
         {m.tipo === "bot" && m.texto !== "¿En qué puedo ayudarte?" && m.texto !== "Sesión vacía. ¿En qué puedo ayudarte?" && (
@@ -249,7 +315,9 @@ const PASOS = {
   campo:    ["Identificando campo…", "Buscando fragmentos…", "Rerankeando resultados…", "Generando respuesta…"],
   calculo:  ["Identificando campo…", "Buscando fórmulas…", "Rerankeando resultados…", "Calculando respuesta…"],
   reporte:  ["Cargando campos del reporte…"],
-  linaje:   ["Buscando origen del campo…", "Consultando Knowledge Base…", "Combinando fuentes…", "Generando linaje…"],
+  linaje:       ["Buscando origen del campo…", "Consultando Knowledge Base…", "Combinando fuentes…", "Generando linaje…"],
+  validaciones: ["Buscando campo…", "Consultando validaciones…", "Armando tabla…"],
+  val_libre:    ["Calculando embedding…", "Buscando por similitud…", "Ordenando resultados…"],
 }
 
 function Dots({ cmd }) {
@@ -290,6 +358,7 @@ export default function App({ auth, onLogout }) {
   const [cmd, setCmd]             = useState("consulta")
   const [reporte, setReporte]     = useState("0430")
   const [cargando, setCargando]   = useState(false)
+  const [topK, setTopK]           = useState(10)
   const [editId, setEditId]       = useState(null)
   const [editVal, setEditVal]     = useState("")
   const [sideOpen, setSideOpen]   = useState(true)
@@ -365,7 +434,9 @@ export default function App({ auth, onLogout }) {
       const body = { pregunta: q, reporte: reporte || null, session_id: sid }
       const config = { signal: controller.signal }
       let r
-      if (cmd === "linaje")   r = await axios.post(`${API}/linaje`, body, config)
+      if (cmd === "linaje")        r = await axios.post(`${API}/linaje`, body, config)
+      else if (cmd === "validaciones") r = await axios.post(`${API}/validaciones`, body, config)
+      else if (cmd === "val_libre")    r = await axios.post(`${API}/validaciones/libre`, {...body, top_k: topK}, config)
       else if (cmd === "consulta") r = await axios.post(`${API}/consulta`, body, config)
       else if (cmd === "campo")   r = await axios.post(`${API}/campo`, body, config)
       else if (cmd === "calculo") r = await axios.post(`${API}/calculo`, body, config)
@@ -539,6 +610,21 @@ export default function App({ auth, onLogout }) {
                 </button>
               ))}
             </div>
+            {cmd === "val_libre" && (
+              <div className="topk-row">
+                <span className="topk-label">Resultados: <b>{topK}</b></span>
+                <input
+                  type="range"
+                  min={5}
+                  max={50}
+                  step={5}
+                  value={topK}
+                  onChange={e => setTopK(Number(e.target.value))}
+                  className="topk-slider"
+                />
+                <span className="topk-hint">5 — 50</span>
+              </div>
+            )}
             <div className="input-row">
               <textarea
                 value={input}

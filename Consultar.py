@@ -380,12 +380,13 @@ def consultar_campo(argumento, historial=None):
     hist = construir_historial(historial or [])
     ejemplos = buscar_ejemplos(campo, "campo", reporte)
 
+    reporte_ctx = f"IMPORTANTE: Responde SOLO sobre el reporte {reporte}. Si los fragmentos son de otro reporte, ignóralos.\n" if reporte else ""
     prompt = f"""[INST] Eres experto en regulación bancaria CNBV. Responde SOLO en español.
 {REGLAS}
-{hist}
+{reporte_ctx}{hist}
 {ejemplos}
 
-Responde sobre "{campo}" con EXACTAMENTE estas 5 líneas en español, nada más:
+Responde sobre "{campo}" del reporte {reporte or "0430"} con EXACTAMENTE estas 5 líneas en español, nada más:
 - CAMPO: {campo}
 - ORIGEN: [PERSONA / LINEA_CREDITO / CATALOGO / CALCULADO / DEFAULT]
 - TIPO: [captura manual / calculado / catálogo]
@@ -416,12 +417,13 @@ def consultar_calculo(argumento, historial=None):
     hist = construir_historial(historial or [])
     ejemplos = buscar_ejemplos(campo, "calculo", reporte)
 
+    reporte_ctx = f"IMPORTANTE: Responde SOLO sobre el reporte {reporte}. Si los fragmentos son de otro reporte, ignóralos.\n" if reporte else ""
     prompt = f"""[INST] Eres experto en regulación bancaria CNBV. Responde SOLO en español.
 {REGLAS}
-{hist}
+{reporte_ctx}{hist}
 {ejemplos}
 
-Explica el cálculo de "{campo}" con EXACTAMENTE estas 6 líneas en español, nada más:
+Explica el cálculo de "{campo}" del reporte {reporte or "0430"} con EXACTAMENTE estas 6 líneas en español, nada más:
 - CAMPO: {campo}
 - SE PUEDE CALCULAR: [Sí / No]
 - FORMULA: [fórmula exacta; si no: No especificada]
@@ -503,12 +505,13 @@ def consultar_libre(pregunta, reporte=None, historial=None):
     hist = construir_historial(historial or [])
     ejemplos = buscar_ejemplos(pregunta, "consulta", reporte)
 
+    reporte_ctx = f"IMPORTANTE: Responde SOLO sobre el reporte {reporte}. Si los fragmentos son de otro reporte, ignóralos.\n" if reporte else ""
     prompt = f"""[INST] Eres experto en regulación bancaria mexicana CNBV. Responde SOLO en español.
 {REGLAS}
-{hist}
+{reporte_ctx}{hist}
 {ejemplos}
 
-Responde la pregunta en español usando solo los fragmentos.
+Responde la pregunta en español usando solo los fragmentos del reporte {reporte or "0430"}.
 Sé específico y concreto. Cita página y documento cuando uses información específica.
 
 FRAGMENTOS:

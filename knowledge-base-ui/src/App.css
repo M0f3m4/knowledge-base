@@ -870,3 +870,39 @@ textarea:disabled { opacity: .4; }
   letter-spacing: .05em;
   margin-bottom: 4px;
 }
+
+/* ── Badges de validaciones ── */
+.val-valor      { background: #0a0f1a; color: #60a5fa; border: 1px solid #1a2a3a; }
+.val-catalogo   { background: #0f1a0a; color: #4ade80; border: 1px solid #1a3a1a; }
+.val-bloque     { background: #1a0a0a; color: #f87171; border: 1px solid #3a1a1a; }
+.val-estructura { background: #1a1a0a; color: #fbbf24; border: 1px solid #3a3a1a; }
+
+/* ── Slider top_k val_libre ── */
+.topk-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 2px;
+}
+
+.topk-label {
+  font-size: 11px;
+  font-family: 'Geist Mono', monospace;
+  color: var(--text2);
+  white-space: nowrap;
+  min-width: 100px;
+}
+
+.topk-slider {
+  flex: 1;
+  accent-color: var(--accent);
+  cursor: pointer;
+  height: 3px;
+}
+
+.topk-hint {
+  font-size: 10px;
+  font-family: 'Geist Mono', monospace;
+  color: var(--text3);
+  white-space: nowrap;
+}
