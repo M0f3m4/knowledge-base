@@ -434,15 +434,47 @@ export default function App({ auth, onLogout }) {
       const body = { pregunta: q, reporte: reporte || null, session_id: sid }
       const config = { signal: controller.signal }
       let r
-      if (cmd === "linaje")        r = await axios.post(`${API}/linaje`, body, config)
-      else if (cmd === "validaciones") r = await axios.post(`${API}/validaciones`, body, config)
-      else if (cmd === "val_libre")    r = await axios.post(`${API}/validaciones/libre`, {...body, top_k: topK}, config)
-      else if (cmd === "consulta") r = await axios.post(`${API}/consulta`, body, config)
-      else if (cmd === "campo")   r = await axios.post(`${API}/campo`, body, config)
-      else if (cmd === "calculo") r = await axios.post(`${API}/calculo`, body, config)
-      else if (cmd === "reporte") r = await axios.post(`${API}/reporte`, { ...body, pregunta: reporte || q }, config)
 
-      setMsgs(p => [...p, { tipo: "bot", texto: r.data.respuesta, fuentes: r.data.fuentes, tabla: r.data.tabla || null, cmd: cmd }])
+      // Streaming solo para consulta
+      if (cmd === "consulta") {
+        const msgId = Date.now()
+        setMsgs(p => [...p, { tipo: "bot", texto: "", fuentes: [], tabla: null, cmd, _streaming: true, _id: msgId }])
+
+        const res = await fetch(`${API}/consulta/stream`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+          signal: controller.signal
+        })
+
+        if (!res.ok) throw new Error(`Error ${res.status}`)
+
+        const reader = res.body.getReader()
+        const decoder = new TextDecoder()
+        let texto = ""
+
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          texto += decoder.decode(value, { stream: true })
+          setMsgs(p => p.map(m => m._id === msgId ? { ...m, texto } : m))
+        }
+
+        // Limpiar flag streaming y agregar fuentes del header
+        const fuentesHeader = res.headers.get("X-Fuentes")
+        const fuentes = fuentesHeader ? JSON.parse(fuentesHeader) : []
+        setMsgs(p => p.map(m => m._id === msgId ? { ...m, texto, fuentes, _streaming: false } : m))
+
+      } else {
+        if (cmd === "linaje")        r = await axios.post(`${API}/linaje`, body, config)
+        else if (cmd === "validaciones") r = await axios.post(`${API}/validaciones`, body, config)
+        else if (cmd === "val_libre")    r = await axios.post(`${API}/validaciones/libre`, {...body, top_k: topK}, config)
+        else if (cmd === "campo")   r = await axios.post(`${API}/campo`, body, config)
+        else if (cmd === "calculo") r = await axios.post(`${API}/calculo`, body, config)
+        else if (cmd === "reporte") r = await axios.post(`${API}/reporte`, { ...body, pregunta: reporte || q }, config)
+
+        setMsgs(p => [...p, { tipo: "bot", texto: r.data.respuesta, fuentes: r.data.fuentes, tabla: r.data.tabla || null, cmd: cmd }])
+      }
 
       const s = sesiones.find(x => x.id === sid)
       if (s?.nombre.startsWith("Sesión")) {
@@ -595,7 +627,7 @@ export default function App({ auth, onLogout }) {
                   />
                 )
               })}
-              {cargando && <Dots cmd={cmd} />}
+              {cargando && !(cmd === "consulta" && msgs.some(m => m._streaming)) && <Dots cmd={cmd} />}
               <div ref={bottom} />
             </>
           )}

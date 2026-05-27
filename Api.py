@@ -14,8 +14,10 @@ from Consultar import (
     consultar_campo,
     consultar_calculo,
     consultar_reporte,
-    consultar_libre
+    consultar_libre,
+    consultar_libre_stream
 )
+from fastapi.responses import StreamingResponse as FastAPIStreamingResponse
 
 load_dotenv()
 
@@ -444,6 +446,57 @@ def endpoint_validaciones_libre(req: ConsultaRequest):
 
     except Exception as e:
         print(f"❌ Error validaciones/libre: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── Consulta Streaming ───────────────────────────────────
+@app.post("/consulta/stream")
+async def endpoint_consulta_stream(req: ConsultaRequest):
+    try:
+        import asyncio
+        import json as _json
+        print(f"📥 consulta/stream: {req.pregunta} | {req.reporte}")
+        historial = obtener_historial(req.session_id)
+        guardar_mensaje(req.session_id, "user", req.pregunta, cmd="consulta")
+
+        gen, fuentes = consultar_libre_stream(req.pregunta, reporte=req.reporte_limpio, historial=historial)
+        fuentes_json = _json.dumps(fuentes)
+        respuesta_completa = []
+
+        async def stream_tokens():
+            loop = asyncio.get_event_loop()
+
+            def next_token():
+                try:
+                    return next(gen)
+                except StopIteration:
+                    return None
+
+            while True:
+                token = await loop.run_in_executor(None, next_token)
+                if token is None:
+                    break
+                respuesta_completa.append(token)
+                yield token.encode("utf-8")
+
+            # Guardar al terminar
+            texto_final = "".join(respuesta_completa)
+            guardar_mensaje(req.session_id, "bot", texto_final, fuentes, cmd="consulta")
+            from Consultar import guardar_cache
+            guardar_cache(req.pregunta, "consulta", req.reporte_limpio, texto_final, fuentes)
+
+        return FastAPIStreamingResponse(
+            stream_tokens(),
+            media_type="text/plain; charset=utf-8",
+            headers={
+                "X-Fuentes": fuentes_json,
+                "Cache-Control": "no-cache",
+                "X-Accel-Buffering": "no",
+                "Access-Control-Expose-Headers": "X-Fuentes"
+            }
+        )
+    except Exception as e:
+        print(f"❌ Error consulta stream: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

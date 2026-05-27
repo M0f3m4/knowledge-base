@@ -505,13 +505,17 @@ def consultar_libre(pregunta, reporte=None, historial=None):
     hist = construir_historial(historial or [])
     ejemplos = buscar_ejemplos(pregunta, "consulta", reporte)
 
-    reporte_ctx = f"IMPORTANTE: Responde SOLO sobre el reporte {reporte}. Si los fragmentos son de otro reporte, ignóralos.\n" if reporte else ""
+    if reporte:
+        reporte_ctx = f"IMPORTANTE: Responde SOLO sobre el reporte {reporte}. Si los fragmentos son de otro reporte, ignóralos.\n"
+    else:
+        reporte_ctx = "IMPORTANTE: Identifica el reporte mencionado en la pregunta. Si la pregunta no especifica reporte, responde basándote únicamente en lo que dicen los fragmentos.\n"
+
     prompt = f"""[INST] Eres experto en regulación bancaria mexicana CNBV. Responde SOLO en español.
 {REGLAS}
 {reporte_ctx}{hist}
 {ejemplos}
 
-Responde la pregunta en español usando solo los fragmentos del reporte {reporte or "0430"}.
+Responde la pregunta en español usando solo los fragmentos.
 Sé específico y concreto. Cita página y documento cuando uses información específica.
 
 FRAGMENTOS:
@@ -525,3 +529,82 @@ Responde SOLO en español.
     respuesta = llm.invoke(prompt)
     guardar_cache(pregunta, "consulta", reporte, respuesta, fuentes)
     return {"respuesta": respuesta, "fuentes": fuentes}
+
+
+# ══════════════════════════════════════════════════════════
+# STREAMING — solo para consulta libre
+# ══════════════════════════════════════════════════════════
+
+def consultar_libre_stream(pregunta, reporte=None, historial=None):
+    """
+    Versión streaming de consultar_libre usando API REST de Ollama directamente.
+    Devuelve un generador que yielda tokens reales conforme Ollama los genera.
+    """
+    import json as _json
+
+    pregunta_lower = pregunta.lower()
+
+    # Caso especial campos calculados
+    reporte_mencionado = reporte
+    if not reporte_mencionado:
+        for r in ["0430", "0431", "0432"]:
+            if r in pregunta:
+                reporte_mencionado = r
+                break
+
+    if reporte_mencionado and any(w in pregunta_lower for w in ["calcul", "automátic", "automatico", "fórmula", "formula"]):
+        resp = respuesta_campos_calculados(reporte_mencionado)
+        if resp:
+            def _gen_static():
+                yield resp
+            return _gen_static(), []
+
+    # Buscar fragmentos
+    fragmentos = buscar(pregunta, top_k=8, reporte=reporte)
+    ctx, fuentes = construir_contexto(fragmentos)
+    hist = construir_historial(historial or [])
+    ejemplos = buscar_ejemplos(pregunta, "consulta", reporte)
+
+    if reporte:
+        reporte_ctx = f"IMPORTANTE: Responde SOLO sobre el reporte {reporte}. Si los fragmentos son de otro reporte, ignóralos.\n"
+    else:
+        reporte_ctx = "IMPORTANTE: Identifica el reporte mencionado en la pregunta. Responde basándote únicamente en los fragmentos.\n"
+
+    prompt = f"""[INST] Eres experto en regulación bancaria mexicana CNBV. Responde SOLO en español.
+{REGLAS}
+{reporte_ctx}{hist}
+{ejemplos}
+
+Responde la pregunta en español usando solo los fragmentos.
+Sé específico y concreto. Cita página y documento cuando uses información específica.
+
+FRAGMENTOS:
+{ctx}
+
+PREGUNTA: {pregunta}
+
+Responde SOLO en español.
+[/INST]"""
+
+    OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
+
+    def _gen():
+        with requests.post(
+            f"{OLLAMA_URL}/api/generate",
+            json={"model": "mistral:7b-instruct", "prompt": prompt, "stream": True},
+            stream=True,
+            timeout=180
+        ) as resp:
+            for line in resp.iter_lines():
+                if line:
+                    try:
+                        data = _json.loads(line)
+                        token = data.get("response", "")
+                        if token:
+                            yield token
+                        if data.get("done"):
+                            break
+                    except:
+                        continue
+
+    return _gen(), fuentes
