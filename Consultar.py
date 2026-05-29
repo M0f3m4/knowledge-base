@@ -35,7 +35,7 @@ print(f"🔍 Voyage query model:  {VOYAGE_QUERY_MODEL}")
 print(f"🔀 Voyage rerank model: {VOYAGE_RERANK_MODEL}")
 
 llm = OllamaLLM(
-    model="mistral:7b-instruct",
+    model=os.getenv("OLLAMA_MODEL", "mistral-small:24b"),
     base_url=os.getenv("OLLAMA_URL"),
     temperature=0
 )
@@ -591,7 +591,7 @@ Responde SOLO en español.
     def _gen():
         with requests.post(
             f"{OLLAMA_URL}/api/generate",
-            json={"model": "mistral:7b-instruct", "prompt": prompt, "stream": True},
+            json={"model": os.getenv("OLLAMA_MODEL", "mistral-small:24b"), "prompt": prompt, "stream": True},
             stream=True,
             timeout=180
         ) as resp:
@@ -608,3 +608,109 @@ Responde SOLO en español.
                         continue
 
     return _gen(), fuentes
+
+
+def _stream_ollama(prompt):
+    """Helper para hacer streaming directo a Ollama REST API"""
+    import json as _json
+    OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
+    with requests.post(
+        f"{OLLAMA_URL}/api/generate",
+        json={"model": os.getenv("OLLAMA_MODEL", "mistral-small:24b"), "prompt": prompt, "stream": True},
+        stream=True,
+        timeout=180
+    ) as resp:
+        for line in resp.iter_lines():
+            if line:
+                try:
+                    data = _json.loads(line)
+                    token = data.get("response", "")
+                    if token:
+                        yield token
+                    if data.get("done"):
+                        break
+                except:
+                    continue
+
+
+def consultar_campo_stream(argumento, historial=None):
+    campo, reporte = resolver_campo(argumento)
+    fragmentos = buscar(f"{campo} origen descripcion reporte {reporte or ''}", reporte=reporte)
+    ctx, fuentes = construir_contexto(fragmentos)
+    hist = construir_historial(historial or [])
+    ejemplos = buscar_ejemplos(campo, "campo", reporte)
+    reporte_ctx = f"IMPORTANTE: Responde SOLO sobre el reporte {reporte}.\n" if reporte else ""
+
+    prompt = f"""[INST] Eres experto en regulación bancaria CNBV. Responde SOLO en español.
+{REGLAS}
+{reporte_ctx}{hist}
+{ejemplos}
+
+Responde sobre "{campo}" con EXACTAMENTE estas 5 líneas en español, nada más:
+- CAMPO: {campo}
+- ORIGEN: [PERSONA / LINEA_CREDITO / CATALOGO / CALCULADO / DEFAULT]
+- TIPO: [captura manual / calculado / catálogo]
+- FORMULA: [si existe; si no: No aplica]
+- NOTAS: [reglas especiales; si no: Ninguna]
+
+FRAGMENTOS:
+{ctx}
+[/INST]"""
+
+    return _stream_ollama(prompt), fuentes, campo, reporte
+
+
+def consultar_calculo_stream(argumento, historial=None):
+    campo, reporte = resolver_campo(argumento)
+    fragmentos = buscar(f"calcular {campo} formula metodologia", top_k=6, reporte=reporte)
+    ctx, fuentes = construir_contexto(fragmentos)
+    hist = construir_historial(historial or [])
+    ejemplos = buscar_ejemplos(campo, "calculo", reporte)
+    reporte_ctx = f"IMPORTANTE: Responde SOLO sobre el reporte {reporte}.\n" if reporte else ""
+
+    prompt = f"""[INST] Eres experto en regulación bancaria CNBV. Responde SOLO en español.
+{REGLAS}
+{reporte_ctx}{hist}
+{ejemplos}
+
+Explica el cálculo de "{campo}" con EXACTAMENTE estas 6 líneas en español:
+- CAMPO: {campo}
+- SE PUEDE CALCULAR: [Sí / No]
+- FORMULA: [fórmula exacta; si no: No especificada]
+- DATOS NECESARIOS: [qué datos se requieren]
+- REFERENCIA: [anexo o sección; si no: No especificada]
+- OBSERVACIONES: [casos especiales; si no: Ninguna]
+
+FRAGMENTOS:
+{ctx}
+[/INST]"""
+
+    return _stream_ollama(prompt), fuentes, campo
+
+
+def consultar_reporte_stream(numero, historial=None):
+    from columnas_0430 import COLUMNAS
+    if numero in COLUMNAS:
+        columnas = COLUMNAS[numero]
+        texto = f"Campos del reporte {numero}:\n\n"
+        for num, nombre in columnas.items():
+            texto += f"{num}. {nombre}\n"
+        def _gen_static():
+            yield texto
+        return _gen_static(), [], numero
+
+    fragmentos = buscar(f"reporte {numero} columnas campos secciones", top_k=6, reporte=numero)
+    ctx, fuentes = construir_contexto(fragmentos)
+
+    prompt = f"""[INST] Eres experto en regulación bancaria CNBV. Responde SOLO en español.
+{REGLAS}
+
+Lista los campos del reporte {numero} en formato tabla:
+| # | Campo | Origen | Calculable |
+|---|-------|--------|------------|
+
+FRAGMENTOS:
+{ctx}
+[/INST]"""
+
+    return _stream_ollama(prompt), fuentes, numero

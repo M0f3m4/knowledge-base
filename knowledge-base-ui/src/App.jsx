@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom"
 import axios from "axios"
 import "./App.css"
 
-const API = "http://localhost:8000"
+const API = import.meta.env.VITE_API_URL || "http://localhost:8000"
 
 const CMDS = [
   { id: "consulta",     label: "Consulta",     ph: "¿Cuál es el objetivo del reporte 0430?" },
