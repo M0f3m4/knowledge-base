@@ -15,7 +15,10 @@ from Consultar import (
     consultar_calculo,
     consultar_reporte,
     consultar_libre,
-    consultar_libre_stream
+    consultar_libre_stream,
+    consultar_campo_stream,
+    consultar_calculo_stream,
+    consultar_reporte_stream
 )
 from fastapi.responses import StreamingResponse as FastAPIStreamingResponse
 
@@ -403,6 +406,34 @@ def endpoint_validaciones_libre(req: ConsultaRequest):
         reporte = req.reporte_limpio or "0430"
         guardar_mensaje(req.session_id, "user", req.pregunta, cmd="val_libre")
 
+        # Primero intentar búsqueda exacta por campo
+        numero, nombre, validaciones_exactas = buscar_validaciones(req.pregunta, reporte)
+
+        if validaciones_exactas:
+            # Encontró un campo específico — devolver exactas
+            respuesta = f"Validaciones del campo {numero}. {nombre.split('. ', 1)[-1]} en el reporte {reporte}:\n\n"
+            for i, v in enumerate(validaciones_exactas, 1):
+                tipo = f"[{v['tipo_val']}] " if v.get('tipo_val') else ""
+                respuesta += f"{i}. {tipo}{v['descripcion']}\n"
+                if v.get('condicion'):
+                    respuesta += f"   → Condición: {v['condicion']}\n"
+            respuesta += f"\nTotal: {len(validaciones_exactas)} validaciones"
+
+            tabla_val = {
+                "numero": numero,
+                "campo": nombre,
+                "reporte": reporte,
+                "total": len(validaciones_exactas),
+                "validaciones": [
+                    {"id": v.get("id_validacion", ""), "descripcion": v.get("descripcion", ""),
+                     "tipo": v.get("tipo_val", "VALOR"), "condicion": v.get("condicion", "")}
+                    for v in validaciones_exactas
+                ]
+            }
+            guardar_mensaje(req.session_id, "bot", respuesta, [], cmd="val_libre", tabla=tabla_val)
+            return {"respuesta": respuesta, "fuentes": [], "tabla": tabla_val}
+
+        # No encontró campo específico — búsqueda semántica
         resultados = buscar_validaciones_libre(req.pregunta, reporte, top_k=req.top_k)
 
         if not resultados:
@@ -450,6 +481,45 @@ def endpoint_validaciones_libre(req: ConsultaRequest):
 
 
 # ── Consulta Streaming ───────────────────────────────────
+async def _make_stream_response(gen, fuentes, extra_headers=None):
+    """Helper para crear StreamingResponse async desde un generador síncrono"""
+    import asyncio
+    import json as _json
+
+    respuesta_completa = []
+
+    async def _async_gen():
+        loop = asyncio.get_event_loop()
+
+        def _next():
+            try:
+                return next(gen)
+            except StopIteration:
+                return None
+
+        while True:
+            token = await loop.run_in_executor(None, _next)
+            if token is None:
+                break
+            respuesta_completa.append(token)
+            yield token.encode("utf-8")
+
+    headers = {
+        "X-Fuentes": _json.dumps(fuentes),
+        "Cache-Control": "no-cache",
+        "X-Accel-Buffering": "no",
+        "Access-Control-Expose-Headers": "X-Fuentes",
+    }
+    if extra_headers:
+        headers.update(extra_headers)
+
+    return FastAPIStreamingResponse(
+        _async_gen(),
+        media_type="text/plain; charset=utf-8",
+        headers=headers
+    ), respuesta_completa
+
+
 @app.post("/consulta/stream")
 async def endpoint_consulta_stream(req: ConsultaRequest):
     try:
@@ -497,6 +567,105 @@ async def endpoint_consulta_stream(req: ConsultaRequest):
         )
     except Exception as e:
         print(f"❌ Error consulta stream: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── Campo Stream ─────────────────────────────────────────
+@app.post("/campo/stream")
+async def endpoint_campo_stream(req: ConsultaRequest):
+    try:
+        import json as _json
+        historial = obtener_historial(req.session_id)
+        guardar_mensaje(req.session_id, "user", req.pregunta, cmd="campo")
+        argumento = f"{req.pregunta} {req.reporte_limpio}".strip() if req.reporte_limpio else req.pregunta
+        gen, fuentes, campo, reporte = consultar_campo_stream(argumento, historial=historial)
+        respuesta_completa = []
+
+        async def _gen():
+            import asyncio
+            loop = asyncio.get_event_loop()
+            def _next():
+                try: return next(gen)
+                except StopIteration: return None
+            while True:
+                token = await loop.run_in_executor(None, _next)
+                if token is None: break
+                respuesta_completa.append(token)
+                yield token.encode("utf-8")
+            texto = "".join(respuesta_completa)
+            guardar_mensaje(req.session_id, "bot", texto, fuentes, cmd="campo")
+            from Consultar import guardar_cache
+            guardar_cache(campo, "campo", reporte, texto, fuentes)
+
+        return FastAPIStreamingResponse(_gen(), media_type="text/plain; charset=utf-8",
+            headers={"X-Fuentes": _json.dumps(fuentes), "Cache-Control": "no-cache",
+                     "X-Accel-Buffering": "no", "Access-Control-Expose-Headers": "X-Fuentes"})
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── Cálculo Stream ────────────────────────────────────────
+@app.post("/calculo/stream")
+async def endpoint_calculo_stream(req: ConsultaRequest):
+    try:
+        import json as _json
+        historial = obtener_historial(req.session_id)
+        guardar_mensaje(req.session_id, "user", req.pregunta, cmd="calculo")
+        argumento = f"{req.pregunta} {req.reporte_limpio}".strip() if req.reporte_limpio else req.pregunta
+        gen, fuentes, campo = consultar_calculo_stream(argumento, historial=historial)
+        respuesta_completa = []
+
+        async def _gen():
+            import asyncio
+            loop = asyncio.get_event_loop()
+            def _next():
+                try: return next(gen)
+                except StopIteration: return None
+            while True:
+                token = await loop.run_in_executor(None, _next)
+                if token is None: break
+                respuesta_completa.append(token)
+                yield token.encode("utf-8")
+            texto = "".join(respuesta_completa)
+            guardar_mensaje(req.session_id, "bot", texto, fuentes, cmd="calculo")
+            from Consultar import guardar_cache
+            guardar_cache(campo, "calculo", req.reporte_limpio, texto, fuentes)
+
+        return FastAPIStreamingResponse(_gen(), media_type="text/plain; charset=utf-8",
+            headers={"X-Fuentes": _json.dumps(fuentes), "Cache-Control": "no-cache",
+                     "X-Accel-Buffering": "no", "Access-Control-Expose-Headers": "X-Fuentes"})
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── Reporte Stream ────────────────────────────────────────
+@app.post("/reporte/stream")
+async def endpoint_reporte_stream(req: ConsultaRequest):
+    try:
+        import json as _json
+        historial = obtener_historial(req.session_id)
+        guardar_mensaje(req.session_id, "user", req.pregunta, cmd="reporte")
+        gen, fuentes, numero = consultar_reporte_stream(req.reporte_limpio or req.pregunta, historial=historial)
+        respuesta_completa = []
+
+        async def _gen():
+            import asyncio
+            loop = asyncio.get_event_loop()
+            def _next():
+                try: return next(gen)
+                except StopIteration: return None
+            while True:
+                token = await loop.run_in_executor(None, _next)
+                if token is None: break
+                respuesta_completa.append(token)
+                yield token.encode("utf-8")
+            texto = "".join(respuesta_completa)
+            guardar_mensaje(req.session_id, "bot", texto, fuentes, cmd="reporte")
+
+        return FastAPIStreamingResponse(_gen(), media_type="text/plain; charset=utf-8",
+            headers={"X-Fuentes": _json.dumps(fuentes), "Cache-Control": "no-cache",
+                     "X-Accel-Buffering": "no", "Access-Control-Expose-Headers": "X-Fuentes"})
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 

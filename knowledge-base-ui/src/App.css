@@ -906,3 +906,33 @@ textarea:disabled { opacity: .4; }
   color: var(--text3);
   white-space: nowrap;
 }
+
+/* ── User meta (cmd + reporte) ── */
+.user-meta {
+  display: flex;
+  gap: 5px;
+  justify-content: flex-end;
+  margin-bottom: 3px;
+}
+
+.user-meta-cmd {
+  font-size: 9px;
+  font-family: 'Geist Mono', monospace;
+  color: var(--text3);
+  background: var(--s2);
+  border: 1px solid var(--border);
+  padding: 1px 6px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.user-meta-rep {
+  font-size: 9px;
+  font-family: 'Geist Mono', monospace;
+  color: #60a5fa;
+  background: #0a0a1f;
+  border: 1px solid #1a1a3a;
+  padding: 1px 6px;
+  border-radius: 3px;
+}

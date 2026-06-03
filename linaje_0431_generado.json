@@ -1,0 +1,280 @@
+[
+  {
+    "reporte": "0431",
+    "numero": 1,
+    "clave": "PERIODO",
+    "nombre": "PERIODO",
+    "linaje": "Campo calculado — No especificado",
+    "origen": "Campo",
+    "hoja_excel": "PERIODO",
+    "columna_excel": "PERIODO",
+    "tipo": "Manual",
+    "obligatorio": "Sí",
+    "formato": "AAAAMM (6 dígitos)",
+    "catalogo": "No especificado",
+    "condiciones": "No especificado",
+    "relacionados": []
+  },
+  {
+    "reporte": "0431",
+    "numero": 2,
+    "clave": "CLAVE_DE_LA_INSTITUCIÓN",
+    "nombre": "CLAVE DE LA INSTITUCIÓN",
+    "linaje": "Insumo PERSONA — columna A CLAVE DE LA INSTITUCION",
+    "origen": "Insumo",
+    "hoja_excel": "PERSONA / LINEA_CREDITO / CREDITO / A CLAVE DE LA INSTITUCIÓN",
+    "columna_excel": "A CLAVE DE LA INSTITUCION",
+    "tipo": "Manual",
+    "obligatorio": "Sí",
+    "formato": "No especificado",
+    "catalogo": "Catálogo de Instituciones",
+    "condiciones": "No especificado",
+    "relacionados": [
+      "A CLAVE DE LA INSTITUCIÓN"
+    ]
+  },
+  {
+    "reporte": "0431",
+    "numero": 3,
+    "clave": "REPORTE",
+    "nombre": "REPORTE",
+    "linaje": "Insumo CREDITO — columna REPORTE",
+    "origen": "Insumo",
+    "hoja_excel": "CREDITO / —",
+    "columna_excel": "REPORTE",
+    "tipo": "Manual",
+    "obligatorio": "Sí",
+    "formato": "Númerico, longitud 4, sin decimales",
+    "catalogo": "No especificado",
+    "condiciones": "Consultar en el Catálogo de Subreportes CC",
+    "relacionados": [
+      "PERIODO",
+      "CLAVE DE LA INSTITUCIÓN"
+    ]
+  },
+  {
+    "reporte": "0431",
+    "numero": 4,
+    "clave": "IDENTIFICADOR_DEL_ACREDITADO_ASIGNADO_POR_LA_INSTITUCIÓN",
+    "nombre": "IDENTIFICADOR DEL ACREDITADO ASIGNADO POR LA INSTITUCIÓN",
+    "linaje": "Insumo CREDITO — columna IDENTIFICADOR DEL ACREDITADO ASIGNADO POR LA INSTITUCIÓN",
+    "origen": "Insumo",
+    "hoja_excel": "CREDITO",
+    "columna_excel": "IDENTIFICADOR DEL ACREDITADO ASIGNADO POR LA INSTITUCIÓN",
+    "tipo": "Manual",
+    "obligatorio": "Sí",
+    "formato": "Identificador único e irrepetible para cada acreditado con el que internamente la institución lo registra.",
+    "catalogo": "No especificado",
+    "condiciones": "Este identificador deberá ser el mismo con que se identifica al acreditado para todos los distintos productos que tenga contratados con la institución.",
+    "relacionados": [
+      "NOMBRE DEL ACREDITADO"
+    ]
+  },
+  {
+    "reporte": "0431",
+    "numero": 5,
+    "clave": "NOMBRE_DEL_ACREDITADO",
+    "nombre": "NOMBRE DEL ACREDITADO",
+    "linaje": "Insumo PERSONA — columna NOMBRE DEL ACREDITADO",
+    "origen": "Insumo",
+    "hoja_excel": "PERSONA / CREDITO",
+    "columna_excel": "NOMBRE DEL ACREDITADO",
+    "tipo": "Manual",
+    "obligatorio": "Sí",
+    "formato": "Alfanumérico, longitud máxima 250",
+    "catalogo": "No especificado",
+    "condiciones": "Debe ser igual al Nombre del Acreditado reportado en el formulario R04 C-0430 Alta de créditos comerciales.",
+    "relacionados": [
+      "IDENTIFICADOR DEL ACREDITADO",
+      "RFC DEL ACREDITADO"
+    ]
+  },
+  {
+    "reporte": "0431",
+    "numero": 6,
+    "clave": "RFC_DEL_ACREDITADO",
+    "nombre": "RFC DEL ACREDITADO",
+    "linaje": "Insumo PERSONA — columna RFC DEL ACREDITADO",
+    "origen": "Insumo",
+    "hoja_excel": "PERSONA",
+    "columna_excel": "RFC DEL ACREDITADO",
+    "tipo": "Manual",
+    "obligatorio": "Sí",
+    "formato": "Letras mayúsculas y números, sin guión medio, espacios o caracteres especiales",
+    "catalogo": "No especificado",
+    "condiciones": "Reportarse en el formulario R04 C -0430 Alta de créditos comerciales a cargo de personas físicas con actividad empresarial",
+    "relacionados": [
+      "Nombre del acreditado"
+    ]
+  },
+  {
+    "reporte": "0431",
+    "numero": 7,
+    "clave": "IDENTIFICADOR_DEL_CRÉDITO_ASIGNADO_METODOLOGÍA_CNBV",
+    "nombre": "IDENTIFICADOR DEL CRÉDITO ASIGNADO METODOLOGÍA CNBV",
+    "linaje": "Insumo CREDITO — columna Identificador del Crédito Asignado Metodología CNBV",
+    "origen": "Insumo",
+    "hoja_excel": "CREDITO",
+    "columna_excel": "Identificador del Crédito Asignado Metodología CNBV",
+    "tipo": "Manual",
+    "obligatorio": "Sí",
+    "formato": "29 caracteres, comienza con 2, la Institución contenida en este campo debe existir en el catálogo de Instituciones",
+    "catalogo": "No especificado",
+    "condiciones": "Este identificador es único e irrepetible para cada línea de crédito y debe ser el mismo que se reporta en la columna Identificador del Crédito Asignado Metodología CNBV en el formulario R04 C-0430 Alta de créditos comerciales",
+    "relacionados": [
+      "Identificador del Acreditado Asignado por la Institución",
+      "Nombre del Acreditado",
+      "RFC del Acreditado"
+    ]
+  },
+  {
+    "reporte": "0431",
+    "numero": 8,
+    "clave": "NÚMERO_DE_DISPOSICIÓN",
+    "nombre": "NÚMERO DE DISPOSICIÓN",
+    "linaje": "Insumo CREDITO — columna NÚMERO DE DISPOSICIÓN",
+    "origen": "Insumo",
+    "hoja_excel": "CREDITO",
+    "columna_excel": "NÚMERO DE DISPOSICIÓN",
+    "tipo": "Manual",
+    "obligatorio": "Sí",
+    "formato": "Número de hasta 30 caracteres",
+    "catalogo": "No especificado",
+    "condiciones": "El número debe ser el mismo con el que se registró en el formulario R04 C -0431 Seguimiento de créditos comerciales.",
+    "relacionados": [
+      "IDENTIFICADOR_CREDITO"
+    ]
+  },
+  {
+    "reporte": "0431",
+    "numero": 9,
+    "clave": "CLASIFICACIÓN_CONTABLE_R04_A-417",
+    "nombre": "CLASIFICACIÓN CONTABLE (R04 A-417)",
+    "linaje": "Campo calculado — Si la Clasificación Contable (R04 A-0417) está clasificada como Cartera con ries",
+    "origen": "Campo",
+    "hoja_excel": "CREDITO",
+    "columna_excel": "CLASIFICACION_CONTABLE_R04_A-417",
+    "tipo": "Catálogo",
+    "obligatorio": "Sí",
+    "formato": "Númerico, longitud 12",
+    "catalogo": "CC_PE",
+    "condiciones": "Si la Clasificación Contable (R04 A-0417) está clasificada como Cartera con riesgo de crédito Etapa 1, el campo ‘Etapa de Deterioro Metodología General Estándar’ se deberá reportar la clave 1.",
+    "relacionados": [
+      "ETAPA_DETERIORO",
+      "CLASIFICACION_CONTABLE_R04_A-0417"
+    ]
+  },
+  {
+    "reporte": "0431",
+    "numero": 10,
+    "clave": "TIPO_DE_CRÉDITO",
+    "nombre": "TIPO DE CRÉDITO",
+    "linaje": "Insumo CREDITO — columna 10 TIPO DE CRÉDITO",
+    "origen": "Insumo",
+    "hoja_excel": "CREDITO",
+    "columna_excel": "10 TIPO DE CRÉDITO",
+    "tipo": "Catálogo",
+    "obligatorio": "Sí",
+    "formato": "Alfanumérico 5",
+    "catalogo": "Catálogo Tipo de Crédito",
+    "condiciones": "Se validará que la clave a reportar se encuentre en el Catálogo Tipo de Crédito.",
+    "relacionados": [
+      "7 IDENTIFICADOR DEL CRÉDITO"
+    ]
+  },
+  {
+    "reporte": "0431",
+    "numero": 11,
+    "clave": "FECHA_DE_INICIO_DE_OPERACIONES",
+    "nombre": "FECHA DE INICIO DE OPERACIONES",
+    "linaje": "Campo calculado — Se deberá anotar la fecha estimada en que el proyecto iniciará operaciones, de a",
+    "origen": "Campo",
+    "hoja_excel": "CREDITO",
+    "columna_excel": "FECHA DE INICIO DE OPERACIONES",
+    "tipo": "Manual",
+    "obligatorio": "Sí",
+    "formato": "AAAA-MM-DD",
+    "catalogo": "No especificado",
+    "condiciones": "Se deberá anotar la fecha estimada en que el proyecto iniciará operaciones, de acuerdo a lo establecido en la evaluación de dicho proyecto.",
+    "relacionados": [
+      "TIPO DE CRÉDITO"
+    ]
+  },
+  {
+    "reporte": "0431",
+    "numero": 12,
+    "clave": "ETAPA_DE_DETERIORO",
+    "nombre": "ETAPA DE DETERIORO",
+    "linaje": "IV. SECCIÓN RESERVAS / 12",
+    "origen": "IV.",
+    "hoja_excel": "CREDITO",
+    "columna_excel": "45",
+    "tipo": "Catálogo",
+    "obligatorio": "Sí",
+    "formato": "Clave del Catálogo Etapa Deterioro CC",
+    "catalogo": "Etapa Deterioro CC",
+    "condiciones": "Corresponde a la etapa de deterioro crediticio, Etapa 1, Etapa 2, y Etapa 3, tanto para los créditos que se encuentran en el activo o sólo en la administración de la institución.",
+    "relacionados": [
+      "13",
+      "14"
+    ]
+  },
+  {
+    "reporte": "0431",
+    "numero": 13,
+    "clave": "HIPÓTESIS_DE_PRESUNCIÓN_REFUTABLE",
+    "nombre": "HIPÓTESIS DE PRESUNCIÓN REFUTABLE",
+    "linaje": "Tipo de Crédito",
+    "origen": "Tipo",
+    "hoja_excel": "CREDITO",
+    "columna_excel": "HIPÓTESIS DE PRESUNCIÓN REFUTABLE",
+    "tipo": "Catálogo",
+    "obligatorio": "Sí",
+    "formato": "Numérico 1",
+    "catalogo": "Catálogo de Hipótesis presunción refutable",
+    "condiciones": "De acuerdo con el ‘C atálogo Hipótesis presunción refutable'",
+    "relacionados": [
+      "Tipo de Crédito"
+    ]
+  },
+  {
+    "reporte": "0431",
+    "numero": 14,
+    "clave": "PORCENTAJE_DE_PÉRDIDA_ESPERADA",
+    "nombre": "PORCENTAJE DE PÉRDIDA ESPERADA",
+    "linaje": "Insumo CREDITO — columna PORCENTAJE DE PÉRDIDA ESPERADA",
+    "origen": "CREDITO",
+    "hoja_excel": "CREDITO",
+    "columna_excel": "PORCENTAJE DE PÉRDIDA ESPERADA",
+    "tipo": "Calculado / Catálogo",
+    "obligatorio": "Sí",
+    "formato": "Dos decimales sin redondear y sin el signo de porcentaje (%)",
+    "catalogo": "Catálogo de Pérdida Esperada",
+    "condiciones": "La clave reportada en este campo deberá ser consistente con el concepto contable del reporte R04 A-0417 Estimación Preventiva para Riesgos Crediticios y las instituciones asignarán a cada crédito, el porcentaje de perdida esperada que corresponda de acuerdo a lo señalado en el Anexo 19 de la CUB",
+    "relacionados": [
+      "TIPO DE CRÉDITO",
+      "FECHA DE INICIO DE OPERACIONES",
+      "ETAPA DE DETERIORO"
+    ]
+  },
+  {
+    "reporte": "0431",
+    "numero": 15,
+    "clave": "SALDO_INSOLUTO_AL_FINAL_DEL_PERIODO",
+    "nombre": "SALDO INSOLUTO AL FINAL DEL PERIODO",
+    "linaje": "Insumo CREDITO — columna SALDO INSOLUTO AL FINAL DEL PERIODO",
+    "origen": "CREDITO",
+    "hoja_excel": "CREDITO / —",
+    "columna_excel": "SALDO INSOLUTO AL FINAL DEL PERIODO",
+    "tipo": "Calculado",
+    "obligatorio": "Sí",
+    "formato": "Monto en pesos, sin formato específico",
+    "catalogo": "No especificado",
+    "condiciones": "Debe ser consistente con el saldo del reporte R01 A-0111 Catálogo Mínimo y igual al reportado en el formulario R04 C-0431 Seguimiento de créditos comerciales. El dato debe ser mayor o igual a cero.",
+    "relacionados": [
+      "SALDO BASE PARA EL CÁLCULO DE INTERESES EN EL PERIODO",
+      "NÚMERO DE DÍAS UTILIZADOS PARA EL CÁLCULO DE INTERESES EN EL PERIODO",
+      "INTERESES RESULTANTES DE APLICAR LA TASA AL SALDO BASE"
+    ]
+  }
+]

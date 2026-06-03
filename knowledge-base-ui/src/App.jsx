@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom"
 import axios from "axios"
 import "./App.css"
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:8000"
+const API = "http://localhost:8000"
 
 const CMDS = [
   { id: "consulta",     label: "Consulta",     ph: "¿Cuál es el objetivo del reporte 0430?" },
@@ -271,6 +271,12 @@ function Burbuja({ m, onFeedback }) {
 
   return (
     <div className={`burbuja ${m.tipo}`}>
+      {m.tipo === "user" && m.cmd && (
+        <div className="user-meta">
+          <span className="user-meta-cmd">{m.cmd}</span>
+          {m.reporte && <span className="user-meta-rep">{m.reporte}</span>}
+        </div>
+      )}
       {m.tipo === "bot" && <div className="bot-label">CNBV</div>}
       <div className={m.tabla ? "burbuja-inner burbuja-linaje" : "burbuja-inner"}>
         {(m.cmd === 'validaciones' || m.cmd === 'val_libre') && m.tabla && <TablaValidaciones tabla={m.tabla} />}
@@ -424,7 +430,7 @@ export default function App({ auth, onLogout }) {
     if (!input.trim() || cargando || !sid) return
     const q = input.trim()
     setInput("")
-    setMsgs(p => [...p, { tipo: "user", texto: q, cmd, fuentes: null }])
+    setMsgs(p => [...p, { tipo: "user", texto: q, cmd, reporte: reporte || null, fuentes: null }])
     setCargando(true)
 
     const controller = new AbortController()
@@ -466,14 +472,44 @@ export default function App({ auth, onLogout }) {
         setMsgs(p => p.map(m => m._id === msgId ? { ...m, texto, fuentes, _streaming: false } : m))
 
       } else {
-        if (cmd === "linaje")        r = await axios.post(`${API}/linaje`, body, config)
-        else if (cmd === "validaciones") r = await axios.post(`${API}/validaciones`, body, config)
-        else if (cmd === "val_libre")    r = await axios.post(`${API}/validaciones/libre`, {...body, top_k: topK}, config)
-        else if (cmd === "campo")   r = await axios.post(`${API}/campo`, body, config)
-        else if (cmd === "calculo") r = await axios.post(`${API}/calculo`, body, config)
-        else if (cmd === "reporte") r = await axios.post(`${API}/reporte`, { ...body, pregunta: reporte || q }, config)
+        const streamCmds = ["campo", "calculo", "reporte"]
 
-        setMsgs(p => [...p, { tipo: "bot", texto: r.data.respuesta, fuentes: r.data.fuentes, tabla: r.data.tabla || null, cmd: cmd }])
+        if (streamCmds.includes(cmd)) {
+          const msgId = Date.now()
+          setMsgs(p => [...p, { tipo: "bot", texto: "", fuentes: [], tabla: null, cmd, _streaming: true, _id: msgId }])
+
+          const streamBody = cmd === "reporte" ? { ...body, pregunta: reporte || q } : body
+          const res = await fetch(`${API}/${cmd}/stream`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(streamBody),
+            signal: controller.signal
+          })
+
+          if (!res.ok) throw new Error(`Error ${res.status}`)
+
+          const reader = res.body.getReader()
+          const decoder = new TextDecoder()
+          let texto = ""
+
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+            texto += decoder.decode(value, { stream: true })
+            setMsgs(p => p.map(m => m._id === msgId ? { ...m, texto } : m))
+          }
+
+          const fuentesHeader = res.headers.get("X-Fuentes")
+          const fuentes = fuentesHeader ? JSON.parse(fuentesHeader) : []
+          setMsgs(p => p.map(m => m._id === msgId ? { ...m, texto, fuentes, _streaming: false } : m))
+
+        } else {
+          if (cmd === "linaje")        r = await axios.post(`${API}/linaje`, body, config)
+          else if (cmd === "validaciones") r = await axios.post(`${API}/validaciones`, body, config)
+          else if (cmd === "val_libre")    r = await axios.post(`${API}/validaciones/libre`, {...body, top_k: topK}, config)
+
+          setMsgs(p => [...p, { tipo: "bot", texto: r.data.respuesta, fuentes: r.data.fuentes, tabla: r.data.tabla || null, cmd: cmd }])
+        }
       }
 
       const s = sesiones.find(x => x.id === sid)
@@ -627,7 +663,7 @@ export default function App({ auth, onLogout }) {
                   />
                 )
               })}
-              {cargando && !(cmd === "consulta" && msgs.some(m => m._streaming)) && <Dots cmd={cmd} />}
+              {cargando && !msgs.some(m => m._streaming) && <Dots cmd={cmd} />}
               <div ref={bottom} />
             </>
           )}
@@ -648,13 +684,13 @@ export default function App({ auth, onLogout }) {
                 <input
                   type="range"
                   min={5}
-                  max={50}
+                  max={200}
                   step={5}
                   value={topK}
                   onChange={e => setTopK(Number(e.target.value))}
                   className="topk-slider"
                 />
-                <span className="topk-hint">5 — 50</span>
+                <span className="topk-hint">5 — 200</span>
               </div>
             )}
             <div className="input-row">

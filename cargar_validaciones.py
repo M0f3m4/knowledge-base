@@ -120,10 +120,11 @@ def cargar():
             BATCH_SIZE = 64
             errores = 0
 
-            docs_0430 = [d for d in docs if d.get("reporte") == "0430" and d.get("descripcion")]
-            total = len(docs_0430)
-            print(f"🔢 Generando embeddings en batch para reporte 0430 ({total} validaciones)...")
-            print(f"   (Solo se generan para 0430 — para agregar otros reportes editar cargar_validaciones.py)")
+            # Generar embeddings para todos los reportes R04C
+            docs_todos = [d for d in docs if d.get("descripcion")]
+            total = len(docs_todos)
+            docs_0430 = docs_todos  # alias para no cambiar el resto del código
+            print(f"🔢 Generando embeddings en batch para todos los reportes R04C ({total} validaciones)...")
 
             for i in range(0, total, BATCH_SIZE):
                 batch = docs_0430[i:i + BATCH_SIZE]
@@ -151,7 +152,7 @@ def cargar():
                     errores += len(batch)
                     print(f"   ⚠️ Error: {e}")
 
-            print(f"✅ Embeddings 0430 generados en batch ({errores} errores)")
+            print(f"✅ Embeddings R04C generados en batch ({errores} errores)")
         else:
             print("⚠️  VOYAGE_API_KEY no encontrada — sin embeddings (búsqueda libre no disponible)")
 
