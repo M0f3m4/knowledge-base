@@ -284,7 +284,7 @@ def endpoint_linaje(req: ConsultaRequest):
         # Combinar todo en un prompt final
         from langchain_ollama import OllamaLLM
         import os
-        llm = OllamaLLM(model="mistral:7b-instruct", base_url=os.getenv("OLLAMA_URL"))
+        llm = OllamaLLM(model=os.getenv("OLLAMA_MODEL", "mistral:7b-instruct"), base_url=os.getenv("OLLAMA_URL"))
 
         # Buscar específicamente en el Anexo si el campo es calculado
         es_calculado = linaje_excel and "CALCULADO" in linaje_excel.upper()
