@@ -35,7 +35,7 @@ print(f"🔍 Voyage query model:  {VOYAGE_QUERY_MODEL}")
 print(f"🔀 Voyage rerank model: {VOYAGE_RERANK_MODEL}")
 
 llm = OllamaLLM(
-    model=os.getenv("OLLAMA_MODEL", "mistral-small:24b"),
+    model=os.getenv("OLLAMA_MODEL", "mistral:7b-instruct"),
     base_url=os.getenv("OLLAMA_URL"),
     temperature=0
 )
@@ -310,7 +310,12 @@ def buscar(pregunta, top_k=5, reporte=None):
     resultados = list(docs.aggregate(pipeline))
 
     if reporte:
-        resultados = [r for r in resultados if reporte.lower() in r["fuente"].lower()]
+        filtrados = [r for r in resultados if reporte.lower() in r["fuente"].lower()]
+        # Solo aplicar filtro si hay resultados — si no, usar todos los fragmentos
+        if filtrados:
+            resultados = filtrados
+        else:
+            print(f"⚠️ No hay fragmentos para reporte {reporte} en nombre de archivo — usando todos")
 
     try:
         filtro = {"$text": {"$search": pregunta}}
@@ -591,7 +596,7 @@ Responde SOLO en español.
     def _gen():
         with requests.post(
             f"{OLLAMA_URL}/api/generate",
-            json={"model": os.getenv("OLLAMA_MODEL", "mistral-small:24b"), "prompt": prompt, "stream": True},
+            json={"model": os.getenv("OLLAMA_MODEL", "mistral:7b-instruct"), "prompt": prompt, "stream": True},
             stream=True,
             timeout=180
         ) as resp:
@@ -616,7 +621,7 @@ def _stream_ollama(prompt):
     OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
     with requests.post(
         f"{OLLAMA_URL}/api/generate",
-        json={"model": os.getenv("OLLAMA_MODEL", "mistral-small:24b"), "prompt": prompt, "stream": True},
+        json={"model": os.getenv("OLLAMA_MODEL", "mistral:7b-instruct"), "prompt": prompt, "stream": True},
         stream=True,
         timeout=180
     ) as resp:
