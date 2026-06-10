@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom"
 import axios from "axios"
 import "./App.css"
 
-const API = "http://localhost:8000"
+const API = window.location.hostname === "localhost" ? window.location.hostname === "localhost" ? "http://localhost:8000" : `http://${window.location.hostname}:8000` : `http://${window.location.hostname}:8000`
 
 const CMDS = [
   { id: "consulta",     label: "Consulta",     ph: "¿Cuál es el objetivo del reporte 0430?" },

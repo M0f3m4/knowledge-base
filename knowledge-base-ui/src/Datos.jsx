@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom"
 import axios from "axios"
 import "./Datos.css"
 
-const API = "http://localhost:8000"
+const API = window.location.hostname === "localhost" ? "http://localhost:8000" : `http://${window.location.hostname}:8000`
 
 const COLECCIONES = [
   { id: "persona",       label: "Persona",       desc: "Datos del acreditado" },

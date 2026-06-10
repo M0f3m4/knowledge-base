@@ -2,7 +2,7 @@ import { useState } from "react"
 import axios from "axios"
 import "./Login.css"
 
-const API = "http://localhost:8000"
+const API = window.location.hostname === "localhost" ? "http://localhost:8000" : `http://${window.location.hostname}:8000`
 
 export default function Login({ onLogin }) {
   const [modo, setModo]         = useState("login") // "login" | "register"
